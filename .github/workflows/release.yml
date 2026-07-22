@@ -1,0 +1,96 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (must already exist)"
+        required: true
+
+permissions:
+  contents: write        # required to create the release and upload assets
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0          # package.sh uses git describe
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Fetch and verify Jama
+        run: ./scripts/fetch-jama.sh
+
+      - name: Compile
+        run: ./build.sh
+
+      # A tag must never publish artifacts that were not verified at runtime.
+      - name: Run verification harnesses
+        run: ./scripts/run-tests.sh
+
+      - name: Package jars
+        run: ./scripts/package.sh
+
+      - name: Assemble release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          {
+            echo "Repaired build of \`muratcanozdemir/Visual-Processing-Library\`."
+            echo
+            echo "The upstream repository is JD-Core decompiler output from \`ROI_v0.1.jar\`, not source, and does not compile as published. This release is that decompile with the decompiler's damage repaired. See \`README.md\` for all eight damage categories."
+            echo
+            echo "### Verification"
+            echo
+            echo "Built and executed on JDK 21. All harnesses passed:"
+            echo
+            echo "- \`Smoke\` — dilation/erosion morphology"
+            echo "- \`Recovered\` — the algorithms whose loops were reconstructed (ConnectedComponents, GrayQFZ, MaxTree, ConvexHull)"
+            echo "- \`Sweep\` — 12 checks across morphology, thresholding, conversion, and orderings"
+            echo
+            echo "### Artifacts"
+            echo
+            echo "| File | Contents |"
+            echo "|---|---|"
+            echo "| \`vpt-${VERSION}.jar\` | compiled library |"
+            echo "| \`vpt-${VERSION}-sources.jar\` | repaired sources |"
+            echo "| \`SHA256SUMS\` | checksums |"
+            echo
+            echo "### Using it"
+            echo
+            echo "Jama must be on the **runtime** classpath, not only at compile time, or \`Sobel\`, \`PCA\`, and \`NonFlatSE\` throw \`NoClassDefFoundError\`:"
+            echo
+            echo '```sh'
+            echo "java -cp vpt-${VERSION}.jar:jama-1.0.3.jar YourMain"
+            echo '```'
+            echo
+            echo "16 files are excluded from the build (Weka/dataset harnesses, the dead Xuggler \`LoadAVI\`, and the two \`MaxTree_yedek\` backups). See \`EXCLUDED.txt\`."
+            echo
+            echo "### Checksums"
+            echo
+            echo '```'
+            cat build-out/SHA256SUMS
+            echo '```'
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            build-out/*.jar
+            build-out/SHA256SUMS
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') }}

@@ -46,5 +46,6 @@ public class Sweep {
                             double[] mx=e.max(v);
                             if (mx[0]!=5) throw new RuntimeException("bad max"); });
     System.out.println("\n" + pass + " passed, " + fail + " failed");
+    if (fail > 0) System.exit(1);
   }
 }

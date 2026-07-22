@@ -1,0 +1,5 @@
+classes/
+build-out/
+lib/
+oracle/*.class
+release-notes.md
