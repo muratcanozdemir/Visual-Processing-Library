@@ -1,0 +1,16 @@
+vpt/algorithms/io/LoadAVI.java
+vpt/algorithms/mm/gray/connected/maxtree/MaxTree_yedek.java
+vpt/algorithms/mm/gray/connected/maxtree/MaxTree_yedek2.java
+vpt/algorithms/texture/CircularFourierPowerSpectra.java
+vpt/algorithms/texture/alot/ClassifierTest.java
+vpt/algorithms/texture/curet/ClassifierTest.java
+vpt/algorithms/texture/curet/ClassifierTest2.java
+vpt/algorithms/texture/kthtips/ClassifierTest.java
+vpt/algorithms/texture/kthtips/Test1.java
+vpt/algorithms/texture/kthtips/Test2.java
+vpt/algorithms/texture/kthtips/Test3.java
+vpt/algorithms/texture/kthtips2/ClassifierTest2.java
+vpt/algorithms/texture/kthtips2a/ClassifierTest2.java
+vpt/algorithms/texture/outex/Test10.java
+vpt/algorithms/texture/outex/Test14b.java
+vpt/testing/TestAviLoad.java
