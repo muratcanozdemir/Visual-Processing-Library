@@ -15,7 +15,7 @@ import sys
 
 import numpy as np
 
-from .._javacompat import Point, idiv, jint, jround
+from .._javacompat import Point, idiv, jacos, jdiv, jint, jround
 from .Distance import Distance
 
 
@@ -354,7 +354,7 @@ class Tools:
                 p = img.getXYDouble(x, y)
                 if p > 0.0:
                     tmp = Distance.EuclideanDistance(cog.x, cog.y, x, y)
-                    histo[jint((tmp - minimum) / coeff)] += 1.0
+                    histo[jint(jdiv(tmp - minimum, coeff))] += 1.0
 
         for i in range(len(histo)):
             histo[i] /= numberOfNonZeroPixels
@@ -401,8 +401,10 @@ class Tools:
                     cx += x * p
                     cy += y * p
 
-        cog.x = jint(cx / volume)
-        cog.y = jint(cy / volume)
+        # volume is 0 for an all-zero image; Java gives NaN, and
+        # (int) NaN is 0, so the centre of gravity lands at (0, 0).
+        cog.x = jint(jdiv(cx, volume))
+        cog.y = jint(jdiv(cy, volume))
         return cog
 
     # ------------------------------------------------------------------
@@ -509,7 +511,8 @@ class Tools:
         abSqr = ab.x * ab.x + ab.y * ab.y
         cbSqr = cb.x * cb.x + cb.y * cb.y
 
-        cosSqr = dot * dot / abSqr / cbSqr
+        # A degenerate triangle makes abSqr or cbSqr zero.
+        cosSqr = jdiv(jdiv(dot * dot, abSqr), cbSqr)
 
         cos2 = 2.0 * cosSqr - 1.0
 
@@ -518,7 +521,7 @@ class Tools:
         elif cos2 <= -1.0:
             alpha2 = 3.141592653589793
         else:
-            alpha2 = math.acos(cos2)
+            alpha2 = jacos(cos2)
 
         rslt = alpha2 / 2.0
         rs = rslt * 180.0 / 3.141592653589793

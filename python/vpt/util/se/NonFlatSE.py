@@ -15,7 +15,7 @@ import math
 
 import numpy as np
 
-from ..._javacompat import Point, idiv, jround
+from ..._javacompat import Point, idiv, jdiv, jround
 from ...DoubleImage import DoubleImage
 from ..Distance import Distance
 
@@ -117,7 +117,7 @@ class NonFlatSE(DoubleImage):
 
         for x in range(r):
             for y in range(r):
-                dimg.setXYDouble(x, y, dimg.getXYDouble(x, y) / total)
+                dimg.setXYDouble(x, y, jdiv(dimg.getXYDouble(x, y), total))
 
         return NonFlatSE(Point(idiv(r, 2), idiv(r, 2)), dimg)
 

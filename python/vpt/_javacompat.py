@@ -177,6 +177,80 @@ def imod(a: int, b: int) -> int:
 
 
 # --------------------------------------------------------------------------
+# Floating-point arithmetic that does not raise
+# --------------------------------------------------------------------------
+# Java follows IEEE-754 for doubles and never throws on a bad operand:
+#
+#     0.0 / 0.0   -> NaN            Python: ZeroDivisionError
+#     1.0 / 0.0   -> Infinity       Python: ZeroDivisionError
+#     Math.sqrt(-1) -> NaN          Python: ValueError
+#     Math.log(0) -> -Infinity      Python: ValueError
+#     Math.acos(2) -> NaN           Python: ValueError
+#
+# The library relies on this. Degenerate inputs -- an empty region with zero
+# volume, a zero-norm vector, an out-of-domain cosine from accumulated
+# rounding -- propagate quietly as NaN and are filtered downstream by
+# comparisons, which are all false against NaN. A Python port that raises
+# instead turns those into crashes on inputs the Java handles.
+#
+# Use these wherever the Java divides by a *computed* quantity or takes a
+# root/log/inverse-trig of one. A literal or provably non-zero divisor needs
+# no wrapper.
+
+
+def jdiv(a: float, b: float) -> float:
+    """Java ``/`` on doubles: IEEE-754, no exception on a zero divisor."""
+    if b == 0.0:
+        a = float(a)
+        if a != a or a == 0.0:
+            return math.nan
+        # Sign of the result follows the signs of both operands, including
+        # the sign of a negative zero divisor.
+        neg = (math.copysign(1.0, a) < 0) != (math.copysign(1.0, b) < 0)
+        return -math.inf if neg else math.inf
+    return a / b
+
+
+def jsqrt(x: float) -> float:
+    """Java ``Math.sqrt``: NaN for a negative operand."""
+    if x != x or x < 0.0:
+        return math.nan
+    return math.sqrt(x)
+
+
+def jlog(x: float) -> float:
+    """Java ``Math.log``: -Infinity at 0, NaN below it."""
+    if x != x or x < 0.0:
+        return math.nan
+    if x == 0.0:
+        return -math.inf
+    return math.log(x)
+
+
+def jacos(x: float) -> float:
+    """Java ``Math.acos``: NaN outside [-1, 1]."""
+    if x != x or x < -1.0 or x > 1.0:
+        return math.nan
+    return math.acos(x)
+
+
+def jasin(x: float) -> float:
+    """Java ``Math.asin``: NaN outside [-1, 1]."""
+    if x != x or x < -1.0 or x > 1.0:
+        return math.nan
+    return math.asin(x)
+
+
+def jatan(x: float) -> float:
+    """Java ``Math.atan``: total on the extended reals, unlike Python's for
+    infinite input only in that Python already handles it -- provided for
+    symmetry and to keep call sites uniform."""
+    if x != x:
+        return math.nan
+    return math.atan(x)
+
+
+# --------------------------------------------------------------------------
 # java.awt.Point
 # --------------------------------------------------------------------------
 # Used by 155 files in the Java tree, frequently mutated in place after
@@ -239,6 +313,12 @@ __all__ = [
     "iushr",
     "idiv",
     "imod",
+    "jdiv",
+    "jsqrt",
+    "jlog",
+    "jacos",
+    "jasin",
+    "jatan",
 ]
 
 

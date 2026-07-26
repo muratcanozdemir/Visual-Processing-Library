@@ -22,5 +22,25 @@ public class DumpJavaCompat {
     for (int i : is) System.out.println("shr24\t" + i + "\t" + (i >> 24));
     int[][] pairs = {{7,2},{-7,2},{7,-2},{-7,-2},{1,3},{-1,3},{5,5},{-5,3}};
     for (int[] p : pairs) System.out.println("div\t"+p[0]+"\t"+p[1]+"\t"+(p[0]/p[1])+"\t"+(p[0]%p[1]));
+
+    int[][] pairs2 = {{7,2},{-7,2},{7,-2},{-7,-2},{1,3},{-1,3},{5,5},{-5,3}};
+    for (int[] q : pairs2) { }   // placeholder, keeps javac happy if unused
+
+    // IEEE-754 behaviour Python does not share: Java never throws here.
+    double[] num = {0.0, 1.0, -1.0, 2.5, -2.5, Double.NaN, 1e308, -0.0};
+    double[] den = {0.0, -0.0, 1.0, -1.0, 2.0, Double.NaN, 0.5};
+    for (double x : num)
+      for (double y : den)
+        System.out.println("fdiv\t" + Double.toHexString(x) + "\t"
+            + Double.toHexString(y) + "\t" + Double.toHexString(x / y));
+
+    double[] dom = {0.0, -0.0, 1.0, -1.0, 4.0, -4.0, 0.5, -0.5, 2.0, -2.0,
+                    1e-300, 1e300, Double.NaN, Double.POSITIVE_INFINITY,
+                    Double.NEGATIVE_INFINITY};
+    for (double x : dom) System.out.println("fsqrt\t" + Double.toHexString(x) + "\t" + Double.toHexString(Math.sqrt(x)));
+    for (double x : dom) System.out.println("flog\t"  + Double.toHexString(x) + "\t" + Double.toHexString(Math.log(x)));
+    for (double x : dom) System.out.println("facos\t" + Double.toHexString(x) + "\t" + Double.toHexString(Math.acos(x)));
+    for (double x : dom) System.out.println("fasin\t" + Double.toHexString(x) + "\t" + Double.toHexString(Math.asin(x)));
+    for (double x : dom) System.out.println("fatan\t" + Double.toHexString(x) + "\t" + Double.toHexString(Math.atan(x)));
   }
 }

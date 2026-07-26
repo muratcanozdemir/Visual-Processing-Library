@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import math
 
+from .._javacompat import jatan, jdiv
+
 
 class ComplexNumber:
     __slots__ = ("real", "imag")
@@ -35,7 +37,9 @@ class ComplexNumber:
             return 0.0
         # Java uses atan, not atan2, so the result collapses to (-pi/2, pi/2)
         # and loses the quadrant. Preserved.
-        return math.atan(self.imag / self.real)
+        # real == 0 with imag != 0 divides by zero: Java gives +-Infinity
+        # and atan(+-Infinity) is +-pi/2, which is the intended answer.
+        return jatan(jdiv(self.imag, self.real))
 
     def cNorm(self) -> float:
         return self.real * self.real + self.imag * self.imag
@@ -78,8 +82,9 @@ class ComplexNumber:
     def cDiv(z1: "ComplexNumber", z2: "ComplexNumber") -> "ComplexNumber":
         z3 = ComplexNumber()
         n = z2.cNorm()
-        z3.real = (z1.real * z2.real + z1.imag * z2.imag) / n
-        z3.imag = (z2.real * z1.imag - z1.real * z2.imag) / n
+        # n is 0 when z2 is zero; Java propagates Infinity/NaN.
+        z3.real = jdiv(z1.real * z2.real + z1.imag * z2.imag, n)
+        z3.imag = jdiv(z2.real * z1.imag - z1.real * z2.imag, n)
         return z3
 
     def __repr__(self) -> str:

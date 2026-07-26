@@ -8,6 +8,7 @@ change the arithmetic.
 
 from __future__ import annotations
 
+import struct
 from pathlib import Path
 
 import numpy as np
@@ -18,15 +19,29 @@ from vpt._javacompat import (
     imod,
     ishl,
     ishr,
+    jacos,
+    jasin,
+    jatan,
     jbyte,
     jbyte_arr,
+    jdiv,
     jint,
     jint_arr,
+    jlog,
     jround,
     jround_arr,
+    jsqrt,
 )
 
+UNARY = {"fsqrt": jsqrt, "flog": jlog, "facos": jacos,
+         "fasin": jasin, "fatan": jatan}
+
 GOLDEN = Path(__file__).parent / "goldens" / "javacompat.txt"
+
+
+def _bits(x: float) -> int:
+    """IEEE-754 bit pattern, so NaN, +-Infinity and signed zero all differ."""
+    return struct.unpack("<Q", struct.pack("<d", x))[0]
 
 
 def parse_double(s: str) -> float:
@@ -68,6 +83,15 @@ def test_javacompat_matches_java():
             a, b = int(f[1]), int(f[2])
             want = (int(f[3]), int(f[4]))
             got = got_vec = (idiv(a, b), imod(a, b))
+        elif kind == "fdiv":
+            # Doubles are compared by bit pattern so that NaN, +-Infinity and
+            # signed zero are all distinguished. Python raises where Java
+            # returns these, which is the whole point of jdiv.
+            want = _bits(parse_double(f[3]))
+            got = got_vec = _bits(jdiv(parse_double(f[1]), parse_double(f[2])))
+        elif kind in UNARY:
+            want = _bits(parse_double(f[2]))
+            got = got_vec = _bits(UNARY[kind](parse_double(f[1])))
         else:
             failures.append(f"line {n}: unknown row kind {kind!r}")
             continue

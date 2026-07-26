@@ -13,6 +13,8 @@ from __future__ import annotations
 import math
 import sys
 
+from .._javacompat import jacos, jdiv, jsqrt
+
 
 class Distance:
     @staticmethod
@@ -68,10 +70,12 @@ class Distance:
         sumQ = 0.0
         for i in range(len(p)):
             sumQ += q[i]
-        temp = math.sqrt(sumP * sumQ)
+        temp = jsqrt(sumP * sumQ)
         for i in range(len(p)):
-            distance += math.sqrt(p[i] * q[i]) / temp
-        return math.sqrt(1.0 - distance)
+            distance += jdiv(jsqrt(p[i] * q[i]), temp)
+        # 1.0 - distance goes negative for non-normalised inputs, where
+        # Java's sqrt yields NaN rather than raising.
+        return jsqrt(1.0 - distance)
 
     @staticmethod
     def cosine(p, q) -> float:
@@ -84,10 +88,11 @@ class Distance:
         sumQ = 0.0
         for i in range(len(p)):
             sumQ += q[i] * q[i]
-        temp = math.sqrt(sumP * sumQ)
+        temp = jsqrt(sumP * sumQ)
         for i in range(len(p)):
             distance += p[i] * q[i]
-        return distance / temp
+        # temp is 0 for a zero vector; Java returns +-Infinity or NaN.
+        return jdiv(distance, temp)
 
     @staticmethod
     def spectralAngleDistance(p, q) -> float:
@@ -99,7 +104,9 @@ class Distance:
         norm1 = Tools.norm(p)
         norm2 = Tools.norm(q)
 
-        return math.acos(dotProduct / (norm1 * norm2))
+        # Both norms are 0 for zero vectors, and accumulated rounding can
+        # push the ratio just outside [-1, 1]; Java yields NaN for both.
+        return jacos(jdiv(dotProduct, norm1 * norm2))
 
     @staticmethod
     def innerProduct(p, q) -> float:
@@ -139,5 +146,5 @@ class Distance:
         distance = 0.0
         for i in range(len(p)):
             if p[i] > 0.0 or q[i] > 0.0:
-                distance += (p[i] - q[i]) * (p[i] - q[i]) / (p[i] + q[i])
+                distance += jdiv((p[i] - q[i]) * (p[i] - q[i]), p[i] + q[i])
         return distance
