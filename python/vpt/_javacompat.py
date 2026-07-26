@@ -225,6 +225,7 @@ __all__ = [
     "LONG_MAX",
     "DOUBLE_MAX_VALUE",
     "Point",
+    "Point2D",
     "jround",
     "jround_arr",
     "jint",
@@ -239,3 +240,32 @@ __all__ = [
     "idiv",
     "imod",
 ]
+
+
+class Point2D:
+    """Mutable 2-D floating point, mirroring ``java.awt.geom.Point2D.Double``."""
+
+    __slots__ = ("x", "y")
+
+    def __init__(self, x: float = 0.0, y: float = 0.0):
+        self.x = float(x)
+        self.y = float(y)
+
+    def getX(self) -> float:
+        return self.x
+
+    def getY(self) -> float:
+        return self.y
+
+    def setLocation(self, x: float, y: float) -> None:
+        self.x = float(x)
+        self.y = float(y)
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Point2D) and self.x == other.x and self.y == other.y
+
+    def __hash__(self) -> int:
+        return hash((self.x, self.y))
+
+    def __repr__(self) -> str:
+        return f"Point2D(x={self.x},y={self.y})"

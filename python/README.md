@@ -53,6 +53,36 @@ each is flagged in a comment at its site.
 Do not "fix" any of these without regenerating the goldens and explaining the
 change — the test suite will fail, which is the point.
 
+## Known divergence from the Java
+
+One, so far: **`NonFlatSE.decompose` may return sign-flipped kernels.**
+
+Java uses Jama's SVD, the port uses `numpy.linalg.svd`. An SVD is unique only
+up to a joint sign flip of the leading singular vectors, so both are correct
+and neither is canonical. Jama's own sign is not self-consistent — measured
+against the oracle it is positive for `Gaussian(1)`, `Gaussian(3)`,
+`Gaussian(4)` and negative for `Gaussian(2)`, `Gaussian(6)`, `box(1)` —
+so matching it would mean reimplementing Jama's Golub-Reinsch iteration
+including its sign quirks.
+
+That is not worth doing, because the result is unobservable. The only caller,
+`algorithms.linear.Convolution`, does:
+
+```java
+NonFlatSE[] subKernels = this.se.decompose();
+subKernels = null;                              // line 47 of the original
+if (subKernels == null) { /* non-separable path */ }
+```
+
+The separable branch is dead code, and has been since the original JAR. The
+outer product `h ⊗ v` that a live caller would use is sign-invariant anyway.
+
+The sign difference does propagate into `getCoords`, because a negative centre
+value suppresses the leading `(0,0)` and leaves a trailing `null` slot. The
+test asserts that each side produces the coords pattern *its own* sign
+implies, which verifies the mechanism is ported faithfully without inventing
+a convention that neither library guarantees.
+
 ## Tests
 
 ```sh
