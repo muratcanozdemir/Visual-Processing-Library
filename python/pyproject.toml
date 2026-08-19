@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vpt"
+version = "0.1.0.dev0"
+description = "Visual Processing Library — Python port of the VPT Java library"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "../LICENSE" }
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "pytest-cov>=4"]
+
+[tool.setuptools.packages.find]
+include = ["vpt*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error::RuntimeWarning"]
+
+[tool.coverage.run]
+source = ["vpt"]
+
+[tool.coverage.report]
+# No --cov-fail-under is set (deliberately, not an oversight): the baseline
+# is ~84% line coverage, but a meaningful chunk of the gap is legitimately
+# hard to hit under this port's own rules -- defensive branches that are
+# provably dead for any in-range input (the many `else: print("sorun var
+# ...")` debug branches across the HSY conversion family, for instance),
+# and error/exception paths. Picking a number without separating "real gap"
+# from "structurally unreachable" would either fail the build on code that
+# can't be tested, or be set low enough to be meaningless. Run
+# `pytest --cov=vpt --cov-report=term-missing` to see the current report
+# before deciding on a threshold, package-by-package rather than one
+# repo-wide number.
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# The port deliberately mirrors Java naming, so the pep8-naming rules that
+# would flag getXYCDouble and friends are off by design.
+ignore = ["N802", "N803", "N806", "N815", "N818"]
