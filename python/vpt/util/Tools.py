@@ -15,7 +15,7 @@ import sys
 
 import numpy as np
 
-from .._javacompat import Point, idiv, jacos, jdiv, jint, jround
+from .._javacompat import Point, idiv, jacos, jdiv, jint
 from .Distance import Distance
 
 

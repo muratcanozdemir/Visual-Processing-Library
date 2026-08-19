@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,12 +7,16 @@ name = "vpt"
 version = "0.1.0.dev0"
 description = "Visual Processing Library — Python port of the VPT Java library"
 readme = "README.md"
-requires-python = ">=3.10"
-license = { file = "../LICENSE" }
+requires-python = ">=3.11"
+# SPDX expression, not `{file = "../LICENSE"}`: setuptools refuses to read a
+# license file located outside the project root (here, the repo root one
+# level up), which broke every install -- editable or not -- of this package.
+license = "MIT"
 dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 test = ["pytest>=7", "pytest-cov>=4"]
+lint = ["ruff>=0.6"]
 
 [tool.setuptools.packages.find]
 include = ["vpt*"]
@@ -41,6 +45,14 @@ source = ["vpt"]
 line-length = 100
 
 [tool.ruff.lint]
+# Ruff's un-pinned default rule set pulls in far more than pycodestyle/pyflakes
+# (bugbear, pyupgrade, simplify, pylint, ...) and floods a 1:1 Java port with
+# stylistic findings it wasn't written against. Scope CI linting to real
+# correctness signal: pyflakes (F) and pycodestyle errors (E4/E7/E9).
+select = ["E4", "E7", "E9", "F"]
 # The port deliberately mirrors Java naming, so the pep8-naming rules that
-# would flag getXYCDouble and friends are off by design.
-ignore = ["N802", "N803", "N806", "N815", "N818"]
+# would flag getXYCDouble and friends are off by design. (N isn't in `select`
+# above, so these only matter if N is ever added back.) E741 (ambiguous
+# single-letter names like `l`) is the same category -- the Java source uses
+# `l` for label variables, and this port mirrors it.
+ignore = ["N802", "N803", "N806", "N815", "N818", "N999", "E741"]

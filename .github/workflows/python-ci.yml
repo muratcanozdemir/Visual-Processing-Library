@@ -1,0 +1,98 @@
+name: python-ci
+
+on:
+  push:
+    branches: ["**"]
+    tags-ignore: ["python-v*"]   # tags are handled by python-release.yml
+    paths:
+      - "python/**"
+      - ".github/workflows/python-ci.yml"
+  pull_request:
+    paths:
+      - "python/**"
+      - ".github/workflows/python-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: python
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ".[lint]"
+
+      - name: Ruff check
+        run: ruff check .
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # requires-python floor is 3.11; 3.14 is the current latest.
+        python: ["3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install vpt with test extras
+        run: pip install -e ".[test]"
+
+      - name: Run golden test suite
+        run: pytest -q --cov=vpt --cov-report=term-missing
+
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tool
+        run: pip install build
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      # A wheel that only ever gets built, never installed, can still hide
+      # packaging bugs (missing package data, a bad `packages.find` filter).
+      # Install it fresh and re-run the suite against the installed copy.
+      - name: Verify wheel installs and passes tests
+        run: |
+          python -m venv /tmp/wheel-check
+          /tmp/wheel-check/bin/pip install dist/*.whl pytest pytest-cov
+          cd tests
+          /tmp/wheel-check/bin/python -m pytest -q
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vpt-python-dist
+          path: python/dist/*
+          retention-days: 14
