@@ -1,20 +1,22 @@
 [build-system]
-# >=77 for PEP 639: the SPDX `license` string and `license-files` below.
-requires = ["setuptools>=77"]
-build-backend = "setuptools.build_meta"
+# >=1.27 for PEP 639: the SPDX `license` string and `license-files` below.
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
 [project]
 name = "vpt"
+# Managed by release-please (release-please-config.json at the repo root):
+# its release PRs bump this, uv.lock's matching entry, and CHANGELOG.md
+# together. Don't edit by hand.
 version = "0.1.0"
 description = "Visual Processing Library — Python port of the VPT Java library"
 readme = "README.md"
 requires-python = ">=3.11"
-# SPDX expression, not `{file = "../LICENSE"}`: setuptools refuses to read a
-# license file located outside the project root (here, the repo root one
-# level up), which broke every install -- editable or not -- of this package.
+# SPDX expression (PEP 639), not `{file = "../LICENSE"}`: build backends
+# won't read a license file outside the project root (python/).
 license = "MIT"
-# A copy of the repo-root LICENSE, kept inside python/ so it can ship in the
-# sdist and wheel (setuptools won't read files outside the project root).
+# A copy of the repo-root LICENSE, kept inside python/ so it ships in the
+# sdist and wheel; python-ci fails if the two drift apart.
 license-files = ["LICENSE"]
 authors = [{ name = "Murat Can Ozdemir" }]
 keywords = [
@@ -43,18 +45,23 @@ dependencies = ["numpy>=1.24"]
 [project.urls]
 Repository = "https://github.com/muratcanozdemir/Visual-Processing-Library"
 Issues = "https://github.com/muratcanozdemir/Visual-Processing-Library/issues"
-Changelog = "https://github.com/muratcanozdemir/Visual-Processing-Library/releases"
+Changelog = "https://github.com/muratcanozdemir/Visual-Processing-Library/blob/main/python/CHANGELOG.md"
 
-[project.optional-dependencies]
+# Development-only tooling (PEP 735 dependency groups): not part of the
+# published package's metadata, unlike the old `[test]`/`[lint]` extras.
+# `uv sync` installs the `dev` group by default.
+[dependency-groups]
 test = ["pytest>=7", "pytest-cov>=4"]
 lint = ["ruff>=0.6"]
+dev = [{ include-group = "test" }, { include-group = "lint" }]
 
-[tool.setuptools.packages.find]
-include = ["vpt*"]
+[tool.hatch.build.targets.wheel]
+# Everything under vpt/ ships, including the PEP 561 `py.typed` marker.
+packages = ["vpt"]
 
-[tool.setuptools.package-data]
-# PEP 561 marker: tells type checkers to use the inline annotations.
-vpt = ["py.typed"]
+[tool.hatch.build.targets.sdist]
+# pyproject.toml, the readme and license-files are always included.
+include = ["vpt", "tests", "CHANGELOG.md", "IMPROVEMENTS.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
