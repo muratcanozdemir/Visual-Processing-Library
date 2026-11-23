@@ -13,7 +13,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jint_arr, jround_arr
+from ..._javacompat import jint_arr, jpow_arr, jround_arr
 from ...Algorithm import Algorithm
 from ...ByteImage import ByteImage
 from ...DoubleImage import DoubleImage
@@ -47,6 +47,10 @@ class XYZ2LAB(Algorithm):
         # but np.where still evaluates both branches eagerly, so the power
         # is computed under an errstate guard to silence the (discarded)
         # invalid-value warning from the not-taken branch's <=0 inputs.
+        # The power goes through jpow_arr (per-element math.pow), not numpy
+        # `**`: np.power is not bit-identical to libm/Java Math.pow, and on
+        # AVX-512 CPUs numpy dispatches to SIMD kernels that drift by several
+        # ulps -- which broke the bit-exact golden test on some CI runners.
         xyz = self.input.getDoubleArray().reshape(ydim, xdim, cdim)
         x_, y_, z_ = xyz[:, :, 0], xyz[:, :, 1], xyz[:, :, 2]
 
@@ -55,13 +59,13 @@ class XYZ2LAB(Algorithm):
 
         with np.errstate(invalid="ignore"):
             Xfrac = np.where(
-                Xfrac > _THRESHOLD, Xfrac**0.333333, (903.29999999999995 * Xfrac + 16.0) / 116.0
+                Xfrac > _THRESHOLD, jpow_arr(Xfrac, 0.333333), (903.29999999999995 * Xfrac + 16.0) / 116.0
             )
             Yfrac = np.where(
-                Yfrac > _THRESHOLD, Yfrac**0.333333, (903.29999999999995 * Yfrac + 16.0) / 116.0
+                Yfrac > _THRESHOLD, jpow_arr(Yfrac, 0.333333), (903.29999999999995 * Yfrac + 16.0) / 116.0
             )
             Zfrac = np.where(
-                Zfrac > _THRESHOLD, Zfrac**0.333333, (903.29999999999995 * Zfrac + 16.0) / 116.0
+                Zfrac > _THRESHOLD, jpow_arr(Zfrac, 0.333333), (903.29999999999995 * Zfrac + 16.0) / 116.0
             )
 
         lab = np.empty((ydim, xdim, cdim), dtype=np.float64)
