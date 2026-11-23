@@ -781,6 +781,14 @@ payoff: small. Profiling a 64x64 image showed the 15 upstream
 `GrayQFZSoille` calls take ~70% of the runtime and this loop ~15%, so the
 end-to-end gain is ~10%. `GrayQFZSoille` is the real hot path if this
 algorithm ever needs to be faster.
+**Follow-up 2026-11-23:** `GrayQFZSoille` itself was then sped up ~2.5x
+(same priority-flood, step for step, on flat Python lists instead of
+per-pixel Image accessors and `Point` objects, with `deque` FIFO buckets
+instead of `list.pop(0)`). Label images identical to the previous code on
+792 cases (byte/double input, 1x1 to 31x17, alpha/omega from 0 to 254).
+`QFZBasedStableRegions` on a 64x64 image went from ~3.2s to ~1.0s.
+`flatzones/color/ColorQFZSoille.py` has the same shape and would take the
+same treatment.
 Data-dependent variable-length per-pixel scan over irregular connected-
 component-list structures (`zones[s][x][y]` is a shared Python list per
 component, size varies per pixel/scale). Real structural work: would first

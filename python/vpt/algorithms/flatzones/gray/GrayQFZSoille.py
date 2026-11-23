@@ -30,10 +30,12 @@ second time changes nothing."""
 from __future__ import annotations
 
 import traceback
+from collections import deque
+
+import numpy as np
 
 from ...._javacompat import Point
 from ....Algorithm import Algorithm
-from ....ByteImage import ByteImage
 from ....GlobalException import GlobalException
 from ....Image import Image
 from ....IntegerImage import IntegerImage
@@ -62,111 +64,119 @@ class GrayQFZSoille(Algorithm):
         if self.alpha < 0 or self.alpha > 254 or self.omega < 0 or self.omega > 254:
             raise GlobalException("Arguments out of range.")
 
-        lbl = IntegerImage(self.input, False)
-        lbl.fill(0)
+        # Same algorithm, step for step, on plain Python lists indexed by the
+        # flat pixel position `x + xdim * y` instead of per-pixel Image
+        # getter/setter calls and Point objects (which dominated the
+        # runtime). `rl` is internal scratch (values 0..255 round-trip
+        # exactly through ByteImage), so it never needs to be an image;
+        # `lbl` is written to the output IntegerImage once at the end.
+        # Each pq bucket is a deque: the Java ArrayList.remove(0) is a FIFO
+        # pop, which list.pop(0) made O(n).
+        f = [int(v) for v in self.input.getByteArray()[: xdim * ydim]]
+        lbl = [0] * (xdim * ydim)
+        rl = [255] * (xdim * ydim)
+        offsets = [(n.x, n.y) for n in N]
+        alpha = self.alpha
+        omega = self.omega
 
-        rl = ByteImage(self.input, False)
-        rl.fill(255)
+        stack: list[int] = []
 
-        stack: list[Point] = []
+        pq: dict[int, deque[int]] = {}
 
-        pq: dict[int, list[Point]] = {}
+        def clear_pending() -> None:
+            for i in stack:
+                rl[i] = 255
+            stack.clear()
+            for bucket in pq.values():
+                for i in bucket:
+                    rl[i] = 255
+            pq.clear()
 
         lblval = 1
         for x in range(xdim):
             for y in range(ydim):
-                if lbl.getXYInt(x, y) == 0:
-                    lbl.setXYInt(x, y, lblval)
-                    fp = self.input.getXYByte(x, y)
+                idx = x + xdim * y
+                if lbl[idx] == 0:
+                    lbl[idx] = lblval
+                    fp = f[idx]
                     maxcc = fp
                     mincc = maxcc
-                    rlcrt = self.alpha
+                    rlcrt = alpha
 
-                    for n in N:
-                        qx = x + n.x
-                        qy = y + n.y
+                    for dx, dy in offsets:
+                        qx = x + dx
+                        qy = y + dy
                         if 0 <= qx < xdim and 0 <= qy < ydim:
-                            rlval = abs(fp - self.input.getXYByte(qx, qy))
-                            if lbl.getXYInt(qx, qy) > 0:
+                            q = qx + xdim * qy
+                            rlval = abs(fp - f[q])
+                            if lbl[q] > 0:
                                 if rlcrt >= rlval:
                                     rlcrt = rlval - 1
                             elif rlval <= rlcrt:
-                                rl.setXYByte(qx, qy, rlval)
+                                rl[q] = rlval
                                 if rlval in pq:
-                                    pq[rlval].append(Point(qx, qy))
+                                    pq[rlval].append(q)
                                 else:
-                                    pq[rlval] = [Point(qx, qy)]
+                                    pq[rlval] = deque((q,))
 
                     rcrt = min(pq) if pq else 0
 
                     while pq:
                         datumPrio = min(pq)
                         tmp = pq[datumPrio]
-                        datumP = tmp.pop(0)
+                        datum = tmp.popleft()
                         if not tmp:
                             del pq[datumPrio]
 
-                        if lbl.getXYInt(datumP.x, datumP.y) <= 0:
+                        if lbl[datum] <= 0:
                             if datumPrio > rcrt:
                                 while stack:
-                                    sPoint = stack.pop()
-                                    lbl.setXYInt(sPoint.x, sPoint.y, lblval)
+                                    lbl[stack.pop()] = lblval
                                 rcrt = datumPrio
                                 # Java: `if (lbl.getXYInt(datumP.x, datumP.y) > 0) {}` --
                                 # empty body, no effect.
                             else:
-                                stack.append(datumP)
+                                stack.append(datum)
 
-                                fDatumP = self.input.getXYByte(datumP.x, datumP.y)
+                                fDatumP = f[datum]
                                 if fDatumP < mincc:
                                     mincc = fDatumP
                                 if fDatumP > maxcc:
                                     maxcc = fDatumP
 
-                                if self.omega < maxcc - mincc or rcrt > rlcrt:
-                                    for pp in stack:
-                                        rl.setXYByte(pp.x, pp.y, 255)
-                                    stack.clear()
-
-                                    for k in sorted(pq):
-                                        for p in pq[k]:
-                                            rl.setXYByte(p.x, p.y, 255)
-                                    pq.clear()
+                                if omega < maxcc - mincc or rcrt > rlcrt:
+                                    clear_pending()
                                     break
 
-                                for n in N:
-                                    qx = datumP.x + n.x
-                                    qy = datumP.y + n.y
+                                dxp = datum % xdim
+                                dyp = datum // xdim
+                                for dx, dy in offsets:
+                                    qx = dxp + dx
+                                    qy = dyp + dy
                                     if 0 <= qx < xdim and 0 <= qy < ydim:
-                                        rlval = abs(fDatumP - self.input.getXYByte(qx, qy))
+                                        q = qx + xdim * qy
+                                        rlval = abs(fDatumP - f[q])
 
-                                        lblq = lbl.getXYInt(qx, qy)
+                                        lblq = lbl[q]
                                         if lblq > 0 and lblq != lblval and rlcrt >= rlval:
                                             rlcrt = rlval - 1
                                             if rcrt > rlcrt:
-                                                for pp in stack:
-                                                    rl.setXYByte(pp.x, pp.y, 255)
-                                                stack.clear()
-
-                                                for k in sorted(pq):
-                                                    for p in pq[k]:
-                                                        rl.setXYByte(p.x, p.y, 255)
-                                                pq.clear()
+                                                clear_pending()
                                                 break
-                                        elif rlval <= rlcrt and rlval < rl.getXYByte(qx, qy):
-                                            rl.setXYByte(qx, qy, rlval)
+                                        elif rlval <= rlcrt and rlval < rl[q]:
+                                            rl[q] = rlval
                                             if rlval in pq:
-                                                pq[rlval].append(Point(qx, qy))
+                                                pq[rlval].append(q)
                                             else:
-                                                pq[rlval] = [Point(qx, qy)]
+                                                pq[rlval] = deque((q,))
 
                     while stack:
-                        sPoint = stack.pop()
-                        lbl.setXYInt(sPoint.x, sPoint.y, lblval)
+                        lbl[stack.pop()] = lblval
 
                     lblval += 1
 
-        self.output = lbl
+        self.output = IntegerImage(self.input, False)
+        self.output.setIntArray(np.array(lbl, dtype=np.int64))
 
     @staticmethod
     def invoke(img: Image, alpha: int, omega: int) -> Image | None:
