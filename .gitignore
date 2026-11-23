@@ -15,3 +15,5 @@ python/dist/
 .coverage
 .coverage.*
 htmlcov/
+# fast-anything profiler/port state (see python/IMPROVEMENTS.md section 8)
+.fast/
