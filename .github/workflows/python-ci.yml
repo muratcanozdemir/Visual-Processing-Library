@@ -41,6 +41,11 @@ jobs:
       - name: Ruff check
         run: ruff check .
 
+      # python/LICENSE is a copy of the repo-root LICENSE so it can ship in
+      # the wheel/sdist (setuptools won't read outside python/).
+      - name: Bundled LICENSE matches the repo's
+        run: cmp LICENSE ../LICENSE
+
   test:
     runs-on: ubuntu-latest
     strategy:

@@ -4,6 +4,51 @@ A port of the VPT Java library to Python. The Java tree in `../src/` is the
 **behavioural oracle**: it compiles, runs, and every ported file is verified
 against golden values dumped from it.
 
+## Install
+
+From a release (`.whl` attached to each `python-v*` GitHub release):
+
+```sh
+pip install vpt-<version>-py3-none-any.whl
+```
+
+From source, with the test extras:
+
+```sh
+cd python
+pip install -e ".[test]"
+pytest
+```
+
+Requires Python 3.11+ and NumPy.
+
+## Quick start
+
+Images are `ByteImage`/`DoubleImage`/`IntegerImage`/`BooleanImage`; every
+algorithm is a class with a static `invoke(...)`, mirroring the Java API.
+Pixel arrays are flat, indexed `x + xdim * y` (times `cdim` for colour).
+
+```python
+import numpy as np
+from vpt.ByteImage import ByteImage
+from vpt.algorithms.mm.gray import GGradient
+from vpt.algorithms.segmentation import OtsuThreshold
+from vpt.util.se.FlatSE import FlatSE
+
+# A 32x32 grayscale image: a bright square on a dark background.
+pixels = np.zeros((32, 32), dtype=np.int64)
+pixels[8:24, 8:24] = 200
+img = ByteImage(32, 32)
+img.setByteArray(pixels.ravel())  # flat index = x + 32 * y
+
+edges = GGradient.invoke(img, FlatSE.square(3))  # morphological gradient
+mask = OtsuThreshold.invoke(edges)               # BooleanImage
+
+print(mask.getXYBoolean(8, 8), mask.getXYBoolean(16, 16))  # True False
+```
+
+`tests/test_readme.py` runs this snippet, so it stays correct.
+
 ## Status
 
 | Tier | Contents | State |

@@ -1,10 +1,11 @@
 [build-system]
-requires = ["setuptools>=69"]
+# >=77 for PEP 639: the SPDX `license` string and `license-files` below.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "vpt"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Visual Processing Library — Python port of the VPT Java library"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,7 +13,37 @@ requires-python = ">=3.11"
 # license file located outside the project root (here, the repo root one
 # level up), which broke every install -- editable or not -- of this package.
 license = "MIT"
+# A copy of the repo-root LICENSE, kept inside python/ so it can ship in the
+# sdist and wheel (setuptools won't read files outside the project root).
+license-files = ["LICENSE"]
+authors = [{ name = "Murat Can Ozdemir" }]
+keywords = [
+    "image processing",
+    "mathematical morphology",
+    "computer vision",
+    "segmentation",
+    "texture",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Typing :: Typed",
+]
 dependencies = ["numpy>=1.24"]
+
+[project.urls]
+Repository = "https://github.com/muratcanozdemir/Visual-Processing-Library"
+Issues = "https://github.com/muratcanozdemir/Visual-Processing-Library/issues"
+Changelog = "https://github.com/muratcanozdemir/Visual-Processing-Library/releases"
 
 [project.optional-dependencies]
 test = ["pytest>=7", "pytest-cov>=4"]
@@ -20,6 +51,10 @@ lint = ["ruff>=0.6"]
 
 [tool.setuptools.packages.find]
 include = ["vpt*"]
+
+[tool.setuptools.package-data]
+# PEP 561 marker: tells type checkers to use the inline annotations.
+vpt = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
