@@ -60,6 +60,11 @@ jobs:
       - name: Bundled LICENSE matches the repo's
         run: cmp LICENSE ../LICENSE
 
+      # Every wheel ships THIRD_PARTY_NOTICES (the licenses of the code
+      # compiled into vpt._native); fail if a dependency change left it stale.
+      - name: Third-party notices are current
+        run: python3 scripts/third_party_notices.py --check
+
       # release-please owns the version: its release PRs bump pyproject.toml,
       # uv.lock's vpt entry and .release-please-manifest.json together. Fail
       # if a hand edit left them disagreeing.

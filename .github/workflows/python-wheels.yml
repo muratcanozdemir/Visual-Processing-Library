@@ -61,6 +61,15 @@ jobs:
         env:
           VPT_REQUIRE_NATIVE: "1"
         run: |
+          # The wheel must carry the third-party notices (MIT etc. require
+          # them with binary copies).
+          uv run --no-project python - <<'EOF'
+          import glob, zipfile
+          for whl in glob.glob("dist/*.whl"):
+              names = zipfile.ZipFile(whl).namelist()
+              assert any(n.endswith("licenses/THIRD_PARTY_NOTICES") for n in names), whl
+              assert any(n.endswith("licenses/LICENSE") for n in names), whl
+          EOF
           for py in 3.11 3.14; do
             venv="$RUNNER_TEMP/wheel-check-$py"
             uv venv --python "$py" "$venv"

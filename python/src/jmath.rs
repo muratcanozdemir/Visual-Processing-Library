@@ -70,6 +70,17 @@ pub fn acos(x: f64) -> f64 {
 pub fn atan(x: f64) -> f64 {
     libm::atan(x)
 }
+// atan2 below is transcribed from fdlibm's e_atan2.c, which carries:
+//
+// ====================================================
+// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+//
+// Developed at SunSoft, a Sun Microsystems, Inc. business.
+// Permission to use, copy, modify, and distribute this
+// software is freely granted, provided that this notice
+// is preserved.
+// ====================================================
+
 /// fdlibm 5.3's `__ieee754_atan2` (e_atan2.c), transcribed, with
 /// `libm::atan` (bit-identical to fdlibm's, see the module note) for the
 /// general case. Not `libm::atan2`: musl short-circuits `|y/x| > 2^64` to
