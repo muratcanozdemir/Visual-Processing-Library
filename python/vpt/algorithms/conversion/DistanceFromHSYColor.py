@@ -18,6 +18,7 @@ import traceback
 
 import numpy as np
 
+from ..._javacompat import jexp_arr
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -61,7 +62,7 @@ class DistanceFromHSYColor(Algorithm):
         hueDist = np.where(a <= 0.5, a, 1.0 - a)
         lumDist = np.abs(l - ref[2])
         with np.errstate(over="ignore"):
-            sigma = 1.0 / (1.0 + np.exp(-10.0 * (s - 0.35)))
+            sigma = 1.0 / (1.0 + jexp_arr(-10.0 * (s - 0.35)))
         blend = hueDist * (1.0 - sigma) + lumDist * sigma
 
         distance = np.where((l <= 0.1) | (s <= 0.1), 1.0, blend)

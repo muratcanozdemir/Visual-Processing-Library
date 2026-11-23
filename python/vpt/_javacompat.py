@@ -277,6 +277,33 @@ def jdiv_arr(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return out
 
 
+def _libm_map(fn, *arrays: np.ndarray) -> np.ndarray:
+    """Apply scalar ``fn`` (a ``math``-backed Java-semantics wrapper) to
+    every element, broadcasting like a ufunc, and return a float64 array.
+
+    Why not the numpy ufunc (``np.sin``, ``np.exp``, ``np.log10``,
+    ``np.arctan2``, ``np.power``, ...): numpy picks its transcendental
+    kernels by CPU at runtime. On AVX-512 machines it uses SIMD
+    implementations that differ from libm -- and from the Java oracle --
+    by one to several ulps, while on other CPUs it matches libm. That made
+    the bit-exact golden tests pass or fail depending on which GitHub
+    runner a job landed on. ``math.*`` always calls libm, so it gives the
+    same answer on every x86_64 CPU. Only ``np.sqrt`` and the basic
+    arithmetic operators are exempt: IEEE 754 requires them to be
+    correctly rounded, so every implementation agrees.
+
+    ``np.frompyfunc`` still calls ``fn`` once per element in Python, so this
+    is slower than a ufunc; correctness over speed, as everywhere in this
+    port."""
+    arrs = [np.asarray(a, dtype=np.float64) for a in arrays]
+    # `fn` already returns Java's value for every special case; numpy would
+    # otherwise re-raise the FPU flags libm set along the way (e.g. overflow
+    # in exp) as RuntimeWarnings, which the test config turns into errors.
+    with np.errstate(all="ignore"):
+        out = np.frompyfunc(fn, len(arrs), 1)(*arrs)
+    return np.asarray(out, dtype=np.float64)
+
+
 def jsqrt(x: float) -> float:
     """Java ``Math.sqrt``: NaN for a negative operand."""
     if x != x or x < 0.0:
@@ -304,14 +331,9 @@ def jlog10(x: float) -> float:
 
 
 def jlog10_arr(x: np.ndarray) -> np.ndarray:
-    """Elementwise :func:`jlog10`. ``np.log10`` already returns ``-inf`` at
-    0 and NaN for a negative or NaN operand with no extra branching needed
-    -- verified bit-exact against the scalar version across zero/negative/
-    NaN/+-infinity/general-magnitude inputs before use; only the spurious
-    ``divide``/``invalid`` warnings need suppressing."""
-    x = np.asarray(x, dtype=np.float64)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return np.log10(x)
+    """Elementwise :func:`jlog10`, through libm (see :func:`_libm_map`), not
+    ``np.log10``, whose SIMD kernels are CPU-dependent."""
+    return _libm_map(jlog10, x)
 
 
 def jpow(a: float, b: float) -> float:
@@ -479,13 +501,8 @@ def jacos(x: float) -> float:
 
 
 def jacos_arr(x: np.ndarray) -> np.ndarray:
-    """Elementwise :func:`jacos`. ``np.arccos`` already returns NaN outside
-    [-1, 1] (and for NaN input) with no extra branching needed -- verified
-    bit-exact against the scalar version across those cases before use;
-    only the spurious ``invalid value`` warning needs suppressing."""
-    x = np.asarray(x, dtype=np.float64)
-    with np.errstate(invalid="ignore"):
-        return np.arccos(x)
+    """Elementwise :func:`jacos`, through libm (see :func:`_libm_map`)."""
+    return _libm_map(jacos, x)
 
 
 def jasin(x: float) -> float:
@@ -533,16 +550,48 @@ def jatan2(y: float, x: float) -> float:
 
 
 def jatan2_arr(y: np.ndarray, x: np.ndarray) -> np.ndarray:
-    """Elementwise :func:`jatan2`. ``np.arctan2`` already returns NaN for a
-    NaN operand with no extra branching needed, and -- like ``jatan2``
-    itself -- was checked to agree with ``math.atan2`` (both glibc-backed),
-    not the JVM's fdlibm-based one; verified bit-exact against the scalar
-    ``jatan2`` across signed zero/infinity/NaN/general-case inputs before
-    use. Callers inherit the same platform-atan2 caveat ``jatan2`` documents
-    above."""
-    y = np.asarray(y, dtype=np.float64)
-    x = np.asarray(x, dtype=np.float64)
-    return np.arctan2(y, x)
+    """Elementwise :func:`jatan2`, through libm (see :func:`_libm_map`).
+    Callers inherit the platform-atan2 caveat ``jatan2`` documents above."""
+    return _libm_map(jatan2, y, x)
+
+
+def jsin(x: float) -> float:
+    """Java ``Math.sin``: NaN for NaN or +-Infinity (``math.sin`` raises
+    ``ValueError`` on infinity instead)."""
+    if x != x or math.isinf(x):
+        return math.nan
+    return math.sin(x)
+
+
+def jcos(x: float) -> float:
+    """Java ``Math.cos``: NaN for NaN or +-Infinity."""
+    if x != x or math.isinf(x):
+        return math.nan
+    return math.cos(x)
+
+
+def jexp(x: float) -> float:
+    """Java ``Math.exp``: +Infinity on overflow (``math.exp`` raises
+    ``OverflowError`` instead)."""
+    try:
+        return math.exp(x)
+    except OverflowError:
+        return math.inf
+
+
+def jsin_arr(x: np.ndarray) -> np.ndarray:
+    """Elementwise :func:`jsin`, through libm (see :func:`_libm_map`)."""
+    return _libm_map(jsin, x)
+
+
+def jcos_arr(x: np.ndarray) -> np.ndarray:
+    """Elementwise :func:`jcos`, through libm (see :func:`_libm_map`)."""
+    return _libm_map(jcos, x)
+
+
+def jexp_arr(x: np.ndarray) -> np.ndarray:
+    """Elementwise :func:`jexp`, through libm (see :func:`_libm_map`)."""
+    return _libm_map(jexp, x)
 
 
 # --------------------------------------------------------------------------

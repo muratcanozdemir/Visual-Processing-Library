@@ -8,7 +8,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jatan2_arr
+from ..._javacompat import jatan2_arr, jcos_arr, jsin_arr
 from ...Algorithm import Algorithm
 from ...GlobalException import GlobalException
 from ...Image import Image
@@ -49,8 +49,8 @@ class LabelsToMeanHue(Algorithm):
         # precomputing `2*pi` first would round the multiply at a different
         # point and can differ by an ULP.
         angles = self.original.getDoubleArray().reshape(yDim, xDim).T.ravel() * np.pi * 2.0
-        sinSums = np.bincount(labelsArr, weights=np.sin(angles), minlength=nLabels)
-        cosSums = np.bincount(labelsArr, weights=np.cos(angles), minlength=nLabels)
+        sinSums = np.bincount(labelsArr, weights=jsin_arr(angles), minlength=nLabels)
+        cosSums = np.bincount(labelsArr, weights=jcos_arr(angles), minlength=nLabels)
 
         hue = jatan2_arr(sinSums, cosSums) / TWO_PI
         hue = np.where(hue < 0.0, hue + 1.0, hue)

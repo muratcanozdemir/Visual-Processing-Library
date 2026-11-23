@@ -26,7 +26,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jint_arr
+from ..._javacompat import jcos_arr, jint_arr, jsin_arr
 from ...Algorithm import Algorithm
 from ...ByteImage import ByteImage
 from ...GlobalException import GlobalException
@@ -83,7 +83,7 @@ class HoughTransformLine2(Algorithm):
             phi = theta_pixels[:, :, c][mask]
 
             phi2 = np.where(phi < 0.0, phi + 3.141592653589793, phi)
-            r = xs * np.cos(phi2) + ys * np.sin(phi2)
+            r = xs * jcos_arr(phi2) + ys * jsin_arr(phi2)
             row_idx = jint_arr(r) + diag
 
             deg = Tools.radian2degree(phi2)
