@@ -4,6 +4,14 @@ Grayscale erosion by a flat structuring element -- ``GDilation`` with ``min``
 in place of ``max`` and the SE reflected before use (the correct adjunction
 for erosion). Out-of-bounds neighbours read as ``Double.MAX_VALUE`` so they
 never win the min.
+
+**Dead code, preserved**: the ``se.BOX`` fast path (the van Herk/Gil-Werman
+segment buffers below) can never run. ``execute`` replaces ``self.se`` with
+``self.se.reflection()`` *before* testing ``BOX``, and ``FlatSE.reflection``
+builds a fresh SE without copying the flag -- in the Java as well
+(``FlatSE.java``'s ``reflection()``), so every erosion takes
+``_executeGeneral``. Transcribed for parity; it is why this file's line
+coverage looks low, not a missing test.
 """
 
 from __future__ import annotations

@@ -1,0 +1,109 @@
+euclidean(p,q)	0x1.0511de5a8265fp-2
+intersection(p,q)	0x1.0p-2
+bhattacharyya(p,q)	0x1.8349117c17dddp-3
+cosine(p,q)	0x1.c5877eb501772p-1
+spectralAngleDistance(p,q)	0x1.ee2a22e6af027p-2
+innerProduct(p,q)	0x1.f5c28f5c28f5cp-3
+manhattan(p,q)	0x1.0p-1
+chebyshev(p,q)	0x1.3333333333334p-3
+chiSquare(p,q)	0x1.1c782de944fabp-3
+euclidean(p,r)	0x1.cc9f47b50cbfbp1
+intersection(p,r)	0x1.6666666666666p0
+bhattacharyya(p,r)	NaN
+cosine(p,r)	0x1.8c34ee66ed69bp-2
+spectralAngleDistance(p,r)	0x1.2c6aec46cd76bp0
+innerProduct(p,r)	0x1.9999999999999p-1
+manhattan(p,r)	0x1.9333333333333p2
+chebyshev(p,r)	0x1.599999999999ap1
+chiSquare(p,r)	0x1.94808dda5202ap-1
+euclidean(r,q)	0x1.c4a38b0e5ed5cp1
+intersection(r,q)	0x1.4p0
+bhattacharyya(r,q)	NaN
+cosine(r,q)	0x1.0c97739857f62p-1
+spectralAngleDistance(r,q)	0x1.04c04e7dad464p0
+innerProduct(r,q)	0x1.0p0
+manhattan(r,q)	0x1.8p2
+chebyshev(r,q)	0x1.6666666666666p1
+chiSquare(r,q)	0x1.c71c71c71c71bp0
+euclidean(p,p)	0x0.0p0
+intersection(p,p)	0x0.0p0
+bhattacharyya(p,p)	0x0.0p0
+cosine(p,p)	0x1.0p0
+spectralAngleDistance(p,p)	0x1.6a09e667f3bcdp-26
+innerProduct(p,p)	0x1.3333333333334p-2
+manhattan(p,p)	0x0.0p0
+chebyshev(p,p)	0x0.0p0
+chiSquare(p,p)	0x0.0p0
+euclidean(z,z)	0x0.0p0
+intersection(z,z)	0x1.0p0
+bhattacharyya(z,z)	NaN
+cosine(z,z)	NaN
+spectralAngleDistance(z,z)	NaN
+innerProduct(z,z)	0x0.0p0
+manhattan(z,z)	0x0.0p0
+chebyshev(z,z)	0x0.0p0
+chiSquare(z,z)	0x0.0p0
+euclidean(p,z)	0x1.186f174f88473p-1
+intersection(p,z)	0x1.0p0
+bhattacharyya(p,z)	NaN
+cosine(p,z)	NaN
+spectralAngleDistance(p,z)	NaN
+innerProduct(p,z)	0x0.0p0
+manhattan(p,z)	0x1.0p0
+chebyshev(p,z)	0x1.999999999999ap-2
+chiSquare(p,z)	0x1.0000000000001p0
+euclidean(mismatch)	-0x1.0p0
+chiSquare(mismatch)	-0x1.0p0
+euclidean(int)	0x1.f4322a8a1332fp7
+EuclideanDistance(int)	0x1.4p2
+EuclideanDistance(double)	0x1.3502e64db5456p2
+EuclideanDistance(Point)	0x1.4p2
+BitMix.compare	0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,0,1,-1,1,1,0,1,-1,1,1,1,1,-1,0,-1,1,-1,-1,1,-1,1,1,1,1,1,1,0,1,1,1,1,-1,1,1,1,1,-1,-1,-1,0,-1,-1,-1,-1,1,1,1,1,-1,1,-1,1,0,-1,1,-1,1,1,1,1,0,1,-1,1,1,0,1,-1,1,1,1,1,-1,-1,-1,1,-1,-1,0,-1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,-1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,-1,1,-1,-1,-1,-1,-1,-1,-1,-1,1,1,0
+BitMix.max	3	0x1.0p0,0x1.0p0,0x1.0p0
+BitMix.min	3	0x0.0p0,0x0.0p0,0x0.0p0
+BitMix.rank(4)	3	0x1.999999999999ap-4,0x1.ccccccccccccdp-1,0x1.ccccccccccccdp-1
+BitMix.max2	3	0x1.0p-1,0x1.6666666666666p-1,0x1.999999999999ap-4
+BitMix.min2	3	0x1.0p-1,0x1.999999999999ap-3,0x1.ccccccccccccdp-1
+EuclideanNorm.compare	0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,0,1,1,-1,1,0,1,-1,1,1,1,1,-1,0,-1,-1,-1,-1,-1,-1,1,1,-1,1,-1,1,0,-1,-1,-1,-1,-1,1,1,1,1,1,1,1,0,1,1,1,-1,1,1,1,1,-1,1,1,-1,0,-1,-1,-1,1,1,1,1,0,1,1,-1,1,0,1,-1,1,1,1,1,-1,1,1,-1,1,-1,0,-1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,-1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,-1,1,-1,1,-1,-1,-1,-1,-1,-1,1,1,0
+EuclideanNorm.max	3	0x1.0p0,0x1.0p0,0x1.0p0
+EuclideanNorm.min	3	0x0.0p0,0x0.0p0,0x0.0p0
+EuclideanNorm.rank(4)	3	0x1.999999999999ap-3,0x1.999999999999ap-2,0x1.3333333333333p-1
+EuclideanNorm.max2	3	0x1.0p-1,0x1.999999999999ap-3,0x1.ccccccccccccdp-1
+EuclideanNorm.min2	3	0x1.0p-1,0x1.6666666666666p-1,0x1.999999999999ap-4
+LexicoCIELAB.compare	0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,0,1,1,1,-1,0,1,-1,1,1,1,1,-1,0,-1,1,-1,-1,1,-1,1,1,1,1,-1,1,0,1,-1,-1,1,-1,1,1,1,1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1,-1,1,1,1,1,1,0,1,1,-1,1,1,1,1,0,1,1,1,-1,0,1,-1,1,1,1,1,-1,-1,-1,1,-1,-1,0,-1,-1,-1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,-1,-1,-1,1,-1,-1,1,-1,0,1,1,1,-1,-1,-1,1,-1,-1,1,-1,-1,0,1,1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1,0
+LexicoCIELAB.max	3	0x1.0p0,0x1.0p0,0x1.0p0
+LexicoCIELAB.min	3	0x0.0p0,0x0.0p0,0x0.0p0
+LexicoCIELAB.rank(4)	3	0x1.3333333333333p-2,0x0.0p0,0x1.999999999999ap-2
+LexicoCIELAB.max2	3	0x1.0p-1,0x1.999999999999ap-3,0x1.ccccccccccccdp-1
+LexicoCIELAB.min2	3	0x1.0p-1,0x1.6666666666666p-1,0x1.999999999999ap-4
+ReverseLexico.compare	0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,0,1,1,-1,1,0,1,-1,1,1,1,1,-1,0,-1,-1,1,-1,-1,-1,1,-1,-1,1,-1,1,0,-1,1,-1,-1,-1,1,-1,-1,1,1,1,1,0,1,1,1,-1,1,1,1,1,-1,-1,-1,-1,0,-1,-1,-1,1,-1,-1,1,0,1,1,-1,1,0,1,-1,1,1,1,1,-1,1,1,-1,1,-1,0,-1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,0,-1,-1,1,-1,1,1,-1,1,-1,-1,-1,1,0,-1,1,-1,1,1,-1,1,-1,-1,-1,1,1,0
+ReverseLexico.max	3	0x1.0p0,0x1.0p0,0x1.0p0
+ReverseLexico.min	3	0x0.0p0,0x0.0p0,0x0.0p0
+ReverseLexico.rank(4)	3	0x1.0p-1,0x1.6666666666666p-1,0x1.999999999999ap-4
+ReverseLexico.max2	3	0x1.0p-1,0x1.999999999999ap-3,0x1.ccccccccccccdp-1
+ReverseLexico.min2	3	0x1.0p-1,0x1.6666666666666p-1,0x1.999999999999ap-4
+SpectralAngular.compare	0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,0,1,-1,1,-1,0,1,-1,1,1,1,1,-1,0,-1,1,-1,-1,1,-1,1,1,1,1,1,1,0,1,-1,1,1,-1,1,1,1,1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1,-1,1,1,1,1,1,0,1,1,-1,1,1,1,1,0,1,-1,1,-1,0,1,-1,1,1,1,1,-1,-1,-1,1,-1,-1,0,-1,-1,-1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,-1,-1,-1,1,-1,-1,1,-1,0,1,1,1,-1,-1,-1,1,-1,-1,1,-1,-1,0,1,1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1,0
+SpectralAngular.max	3	0x1.0p0,0x1.0p0,0x1.0p0
+SpectralAngular.min	3	0x0.0p0,0x0.0p0,0x0.0p0
+SpectralAngular.rank(4)	3	0x1.3333333333333p-2,0x0.0p0,0x1.999999999999ap-2
+SpectralAngular.max2	3	0x1.0p-1,0x1.6666666666666p-1,0x1.999999999999ap-4
+SpectralAngular.min2	3	0x1.0p-1,0x1.999999999999ap-3,0x1.ccccccccccccdp-1
+CustomLexico(3).compare	0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,0,1,-1,1,-1,0,1,-1,1,1,1,1,-1,0,-1,1,-1,-1,1,-1,1,1,1,1,1,1,0,1,-1,1,1,-1,1,1,1,1,-1,-1,-1,0,-1,-1,-1,-1,-1,-1,-1,1,1,1,1,1,0,1,1,-1,1,1,1,1,0,1,-1,1,-1,0,1,-1,1,1,1,1,-1,-1,-1,1,-1,-1,0,-1,-1,-1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,-1,-1,-1,1,-1,-1,1,-1,0,1,1,1,-1,-1,-1,1,-1,-1,1,-1,-1,0,1,1,-1,-1,-1,1,-1,-1,-1,-1,-1,-1,0
+CustomLexico(3).max	3	0x1.0p0,0x1.0p0,0x1.0p0
+CustomLexico(3).min	3	0x0.0p0,0x0.0p0,0x0.0p0
+CustomLexico(3).rank(4)	3	0x1.3333333333333p-2,0x0.0p0,0x1.999999999999ap-2
+CustomLexico(3).max2	3	0x1.0p-1,0x1.6666666666666p-1,0x1.999999999999ap-4
+CustomLexico(3).min2	3	0x1.0p-1,0x1.999999999999ap-3,0x1.ccccccccccccdp-1
+CustomLexico(2,0,1).compare	0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,0,1,1,1,1,0,1,-1,1,1,1,1,-1,0,-1,-1,-1,-1,-1,-1,1,-1,-1,1,-1,1,0,-1,-1,-1,-1,-1,1,-1,-1,1,-1,1,1,0,1,-1,1,-1,1,1,1,1,-1,1,1,-1,0,-1,-1,-1,1,-1,-1,1,0,1,1,1,1,0,1,-1,1,1,1,1,-1,1,1,-1,1,-1,0,-1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,0,-1,-1,1,-1,1,1,-1,1,-1,-1,-1,1,0,-1,1,-1,1,1,-1,1,-1,-1,-1,1,1,0
+CustomLexico(2,0,1).max	3	0x1.0p0,0x1.0p0,0x1.0p0
+CustomLexico(2,0,1).min	3	0x0.0p0,0x0.0p0,0x0.0p0
+CustomLexico(2,0,1).rank(4)	3	0x1.ccccccccccccdp-1,0x1.999999999999ap-4,0x1.999999999999ap-4
+CustomLexico(2,0,1).max2	3	0x1.0p-1,0x1.999999999999ap-3,0x1.ccccccccccccdp-1
+CustomLexico(2,0,1).min2	3	0x1.0p-1,0x1.6666666666666p-1,0x1.999999999999ap-4
+CompositeOrdering(EuclideanNorm,ReverseLexico,BitMix).compare	0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,0,1,1,-1,1,0,1,-1,1,1,1,1,-1,0,-1,-1,-1,-1,-1,-1,1,1,-1,1,-1,1,0,-1,-1,-1,-1,-1,1,1,1,1,1,1,1,0,1,1,1,-1,1,1,1,1,-1,1,1,-1,0,-1,-1,-1,1,1,1,1,0,1,1,-1,1,0,1,-1,1,1,1,1,-1,1,1,-1,1,-1,0,-1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,-1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,-1,1,-1,1,-1,-1,-1,-1,-1,-1,1,1,0
+CompositeOrdering(EuclideanNorm,ReverseLexico,BitMix).max	3	0x1.0p0,0x1.0p0,0x1.0p0
+CompositeOrdering(EuclideanNorm,ReverseLexico,BitMix).min	3	0x0.0p0,0x0.0p0,0x0.0p0
+CompositeOrdering(EuclideanNorm,ReverseLexico,BitMix).rank(4)	3	0x1.999999999999ap-3,0x1.999999999999ap-2,0x1.3333333333333p-1
+CompositeOrdering(EuclideanNorm,ReverseLexico,BitMix).max2	3	0x1.0p-1,0x1.999999999999ap-3,0x1.ccccccccccccdp-1
+CompositeOrdering(EuclideanNorm,ReverseLexico,BitMix).min2	3	0x1.0p-1,0x1.6666666666666p-1,0x1.999999999999ap-4
+HugeHierarchicalQueue.script	1000000:N:1,1;5:N:2,2;1000000:N:3,3;42:E:null;5:E:EXC;-7:N:4,4;1000000:E:EXC
