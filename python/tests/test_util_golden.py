@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from _platform import libm_ulp
 from vpt._javacompat import Point
 from vpt.util.Distance import Distance
 from vpt.util.HugeHierarchicalQueue import HugeHierarchicalQueue
@@ -122,7 +123,7 @@ def test_util_matches_java_oracle():
             # (== StrictMath.acos); Python's is glibc. With bit-identical
             # arguments they can still differ by 1 ulp (seen at r,q) -- the
             # same accepted fdlibm-vs-glibc divergence as jatan2 documents.
-            tol = 1 if m == "spectralAngleDistance" else 0
+            tol = libm_ulp(1) if m == "spectralAngleDistance" else 0
             check_value(f"{m}({n})", getattr(Distance, m)(a, b), max_ulp=tol)
 
     check_value("euclidean(mismatch)", Distance.euclidean(p, shortv))

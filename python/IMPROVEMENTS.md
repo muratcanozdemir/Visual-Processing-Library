@@ -1071,6 +1071,64 @@ dominates: 64x64 at size 5, 32ms -> 9ms.
 - Platforms without a wheel install from the sdist, which needs a Rust
   toolchain. There is no pure-Python wheel any more.
 
+## 9. Platform-independent `java.lang.Math` (2026-11-23)
+
+**Status:** `[x]` -- found when PR #12's wheel matrix ran the golden
+suite on macOS and Windows for the first time: 2-5 golden tests failed
+there (XYZ2LAB/LAB2XYZ, `javacompat` acos/asin/atan, `FloatingFlatSE.circle`,
+`FourierDescriptor`, ...), each by 1-2 ulp, because `math.*` is the
+platform libm and only glibc happened to agree with the oracle.
+
+**What Java computes** (JDK 21, x86_64 HotSpot; measured with 200,000
+random inputs per function, `Math` vs `StrictMath`):
+- `asin`, `acos`, `atan`, `atan2` (and `hypot`): `StrictMath`, i.e.
+  fdlibm, exactly.
+- `sin`, `cos`, `tan`, `exp`, `log`, `log10`, `pow`: HotSpot intrinsics
+  (Intel's libm, in HotSpot's source only), not fdlibm.
+
+**Candidates measured against `Math`** (mismatches per 200,000):
+
+| fn | glibc | `libm` crate (musl/fdlibm) | correctly rounded (CORE-MATH) |
+|---|---|---|---|
+| asin / acos / atan | 7,121-15,132 | **0** | 7,150-15,187 |
+| atan2 | 35,464 | 0 random, but see below | 35,475 |
+| log / log10 | 11 / 7,541 | 2,378 / 267 | **0 / 0** |
+| sin / cos / tan | 499 / 365 / 1,912 | 5,948 / 5,741 / 7,025 | **289 / 237 / 456** |
+| exp / pow | 500 / 214 | 19,182 / 18,168 | **473 / 99** |
+
+**Done:** `vpt._native` (`python/src/jmath.rs`) provides them all, and
+every `j*` helper in `_javacompat` computes through it:
+- `asin`/`acos`/`atan`: the `libm` crate -- 0 differences in a further
+  900,000 inputs each spread over every exponent.
+- `atan2`: fdlibm's `e_atan2.c` transcribed. The `libm` crate's differs
+  where `|y/x| > 2^60` and `x < 0` (musl returns `+-pi/2`, fdlibm
+  `pi - (z - pi_lo)`): 83,331 of 900,000 stress inputs, and exactly
+  `Sobel.THETA`'s documented divergence. The transcription: 0 in 1.1M.
+- `sin`/`cos`/`tan`/`exp`/`log`/`log10`/`pow`: CORE-MATH, vendored
+  (`python/csrc/core-math`, MIT) and compiled by `build.rs` with
+  `-ffp-contract=off` and no `-march=native`; same mismatch counts as the
+  upstream build. The residual mismatches are all Intel misroundings:
+  the 11 in `tests/goldens/jmath.txt` were checked at 200-bit precision.
+  Matching those too would mean porting HotSpot's intrinsic code
+  (`src/hotspot/cpu/x86/macroAssembler_x86_*.cpp`, Intel's, distributed
+  under the GPLv2 with the rest of HotSpot) into this MIT package -- a
+  licensing decision, not an engineering one, so not done.
+- Every direct platform-math call outside `_javacompat` (114 sites in 30
+  files: `math.sin`, `np.exp`, float `**`, ...) now goes through a `j*`
+  helper; `tests/test_no_platform_math.py` fails on any new one. Along
+  the way: `InvariantMoment`/`MultiInvariantMoment` used exact `int ** int`
+  where Java rounds each `Math.pow` separately (now `jpow`), and
+  `Point.distance` used `hypot` where Java computes
+  `sqrt(dx * dx + dy * dy)`.
+
+**Result:** with the extension, the golden suite passes with every libm
+tolerance removed (Sobel THETA, ZernikeMoment, OrientationMap, LoadFLO,
+point.Log, RGB2HSY/RGB2NUHSY733, spectralAngleDistance), on every platform.
+Only `shape.ZernikeMoments` keeps one (<= 8 ulp): 9 of its 8,362 distinct
+`sin`/`cos`/`pow` arguments are intrinsic misroundings (replayed through
+the JVM). The pure-Python fallback keeps the old tolerances
+(`tests/_platform.py`).
+
 ## Areas audited with no findings (don't re-audit from scratch)
 
 - Overload-splitting (`fill*`/`newInstance*` across `Image`, `ByteImage`,

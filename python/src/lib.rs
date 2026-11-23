@@ -18,6 +18,7 @@ use pyo3::types::PyBytes;
 
 mod amoeba;
 mod area;
+mod jmath;
 mod path;
 
 fn check_len(name: &str, got: usize, want: usize) -> PyResult<()> {
@@ -109,5 +110,6 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(path_run_lengths, m)?)?;
     m.add_function(wrap_pyfunction!(small_components, m)?)?;
     m.add_function(wrap_pyfunction!(amoeba_masks, m)?)?;
+    jmath::register(m)?;
     Ok(())
 }

@@ -17,9 +17,9 @@ popup with no effect on the (unreturned) result, same category as the
 
 from __future__ import annotations
 
-import math
 import traceback
 
+from ..._javacompat import jtan
 from ...Algorithm import Algorithm
 from ...GlobalException import GlobalException
 from ...Image import Image
@@ -46,7 +46,7 @@ class AxisOfSymmetry(Algorithm):
         maxSymmetryTheta = 0.0
         for theta in range(1, 179, 3):
             imageDiff = 0.0
-            tan = math.tan(Tools.degree2radian(theta))
+            tan = jtan(Tools.degree2radian(theta))
             for x in range(self.input.getXDim()):
                 for y in range(self.input.getYDim()):
                     left = self.input.getXYBoolean(x, y)
@@ -77,7 +77,7 @@ class AxisOfSymmetry(Algorithm):
                 maxSymmetry = imageDiff
                 maxSymmetryTheta = theta
 
-        tan = math.tan(Tools.degree2radian(maxSymmetryTheta))
+        tan = jtan(Tools.degree2radian(maxSymmetryTheta))
         for x in range(self.input.getXDim()):
             for y in range(self.input.getYDim()):
                 if y - centroid.y - tan * (x - centroid.x) < 0.0:

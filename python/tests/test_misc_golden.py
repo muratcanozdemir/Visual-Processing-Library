@@ -34,6 +34,7 @@ from pathlib import Path
 
 import pytest
 
+from _platform import libm_ulp
 from vpt import ByteImage
 from vpt.algorithms.experimental import AreaLimits, Weird
 from vpt.algorithms.features import QFZBasedStableRegions
@@ -221,7 +222,7 @@ def test_misc_matches_java_oracle():
     check_double(
         "LoadFLO(fixtures/test.flo)",
         LoadFLO.invoke(str(FIXTURES / "test.flo")),
-        max_ulp=2,
+        max_ulp=libm_ulp(2),
     )
 
     check_int(

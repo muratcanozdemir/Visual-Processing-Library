@@ -8,6 +8,7 @@ version = "0.0.0"
 edition = "2024"
 license = "MIT"
 publish = false
+build = "build.rs"
 
 [lib]
 name = "_native"
@@ -17,6 +18,13 @@ crate-type = ["cdylib"]
 # abi3: one wheel per platform covers every CPython >= 3.11 (the package's
 # requires-python floor).
 pyo3 = { version = "0.30", features = ["extension-module", "abi3-py311"] }
+# fdlibm-derived libm (a port of musl): bit-identical to Java's
+# StrictMath for asin/acos/atan/atan2, which java.lang.Math delegates to.
+libm = "0.2"
+
+[build-dependencies]
+# Compiles the vendored CORE-MATH C sources (csrc/core-math), see build.rs.
+cc = "1"
 
 [profile.release]
 opt-level = 3

@@ -25,7 +25,7 @@ import math
 import sys
 import traceback
 
-from ..._javacompat import idiv
+from ..._javacompat import idiv, jcos, jsin
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -61,8 +61,8 @@ class DFT2D(Algorithm):
                 for _x in range(xdim):
                     for _y in range(ydim):
                         tmp = (idiv(_x * x, xdim) + idiv(_y * y, ydim)) * -6.283185307179586
-                        real += self.input.getXYDouble(_x, _y) * math.cos(tmp)
-                        imag += self.input.getXYDouble(_x, _y) * math.sin(tmp)
+                        real += self.input.getXYDouble(_x, _y) * jcos(tmp)
+                        imag += self.input.getXYDouble(_x, _y) * jsin(tmp)
 
                 real /= math.sqrt(xdim * ydim)
                 imag /= math.sqrt(xdim * ydim)

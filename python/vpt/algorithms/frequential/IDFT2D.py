@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 import traceback
 
-from ..._javacompat import idiv
+from ..._javacompat import idiv, jcos, jsin
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -45,8 +45,8 @@ class IDFT2D(Algorithm):
                         rp = self.real.getXYDouble(_x, _y)
                         ip = self.imag.getXYDouble(_x, _y)
 
-                        pReal += rp * math.cos(tmp) - ip * math.sin(tmp)
-                        pImag += ip * math.cos(tmp) + rp * math.sin(tmp)
+                        pReal += rp * jcos(tmp) - ip * jsin(tmp)
+                        pImag += ip * jcos(tmp) + rp * jsin(tmp)
 
                 pReal /= math.sqrt(xdim * ydim)
                 pImag /= math.sqrt(xdim * ydim)

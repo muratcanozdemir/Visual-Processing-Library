@@ -15,7 +15,7 @@ import math
 
 import numpy as np
 
-from ..._javacompat import Point, idiv, jdiv, jround
+from ..._javacompat import Point, idiv, jcos, jdiv, jexp, jround, jsin
 from ...DoubleImage import DoubleImage
 from ..Distance import Distance
 
@@ -63,8 +63,8 @@ class NonFlatSE(DoubleImage):
 
         perimeter = 8 * radius
         for i in range(perimeter):
-            x = se.center.x + int(jround(radius * math.cos(TWO_PI * i / perimeter)))
-            y = se.center.y + int(jround(radius * math.sin(TWO_PI * i / perimeter)))
+            x = se.center.x + int(jround(radius * jcos(TWO_PI * i / perimeter)))
+            y = se.center.y + int(jround(radius * jsin(TWO_PI * i / perimeter)))
             se.setXYDouble(x, y, height)
         return se
 
@@ -105,7 +105,7 @@ class NonFlatSE(DoubleImage):
             if distance > radius2:
                 vector[index] = 0.0
             else:
-                vector[index] = math.exp(-1.0 * distance / sigma22) / sqrtSigmaPi2
+                vector[index] = jexp(-1.0 * distance / sigma22) / sqrtSigmaPi2
             index += 1
 
         total = 0.0

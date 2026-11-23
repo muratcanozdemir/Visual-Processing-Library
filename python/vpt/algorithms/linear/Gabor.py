@@ -19,7 +19,7 @@ from __future__ import annotations
 import math
 import traceback
 
-from ..._javacompat import Point, idiv, jfloat, jfloat_div
+from ..._javacompat import Point, idiv, jcos, jexp, jfloat, jfloat_div, jlog, jpow, jsin
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -60,22 +60,22 @@ class Gabor(Algorithm):
     def _calculateSigma(waveLength: float, bandwidth: float) -> float:
         return (
             waveLength
-            * math.sqrt(math.log(2.0) / 2.0)
-            * (2.0**bandwidth + 1.0)
-            / ((2.0**bandwidth - 1.0) * math.pi)
+            * math.sqrt(jlog(2.0) / 2.0)
+            * (jpow(2.0, bandwidth) + 1.0)
+            / ((jpow(2.0, bandwidth) - 1.0) * math.pi)
         )
 
     @staticmethod
     def _gaborFunction(
         x: float, y: float, sigma: float, aspectRatio: float, waveLength: float, phaseOffset: float
     ) -> float:
-        gaborReal = math.exp(
-            -((x / sigma) ** 2.0 + (y * aspectRatio / sigma) ** 2.0) / 2.0
-        ) * math.cos(6.283185307179586 * x / waveLength + phaseOffset)
-        gaborImage = math.exp(
-            -((x / sigma) ** 2.0 + (y * aspectRatio / sigma) ** 2.0) / 2.0
-        ) * math.sin(6.283185307179586 * x / waveLength + phaseOffset)
-        return math.sqrt(gaborReal**2.0 + gaborImage**2.0)
+        gaborReal = jexp(
+            -(jpow(x / sigma, 2.0) + jpow(y * aspectRatio / sigma, 2.0)) / 2.0
+        ) * jcos(6.283185307179586 * x / waveLength + phaseOffset)
+        gaborImage = jexp(
+            -(jpow(x / sigma, 2.0) + jpow(y * aspectRatio / sigma, 2.0)) / 2.0
+        ) * jsin(6.283185307179586 * x / waveLength + phaseOffset)
+        return math.sqrt(jpow(gaborReal, 2.0) + jpow(gaborImage, 2.0))
 
     def getKernel(self) -> NonFlatSE:
         sigma = Gabor._calculateSigma(self.waveLength, self.bandwidth)
@@ -86,8 +86,8 @@ class Gabor(Algorithm):
             for y in range(-idiv(self.height, 2), idiv(self.height, 2) + 1):
                 d = 0.0
                 for orientation in self.orientations:
-                    x1 = x * math.cos(orientation) + y * math.sin(orientation)
-                    y1 = -1 * x * math.sin(orientation) + y * math.cos(orientation)
+                    x1 = x * jcos(orientation) + y * jsin(orientation)
+                    y1 = -1 * x * jsin(orientation) + y * jcos(orientation)
                     d += jfloat(
                         Gabor._gaborFunction(
                             x1, y1, sigma, self.aspectRatio, self.waveLength, self.phaseOffset

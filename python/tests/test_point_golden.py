@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from _platform import libm_ulp
 from vpt import ByteImage, DoubleImage
 from vpt.algorithms.point import Inversion, Log, Power
 
@@ -119,7 +120,7 @@ def test_point_matches_java_oracle():
     # specified to be bit-reproducible across platforms -- JDK 21/x86_64
     # Linux vs. glibc's log10 disagree by 1 ulp at log10(11) and
     # log10(0.75); see python/README.md "Known divergence".
-    check_double("Log(di)", Log.invoke(di), max_ulp=1)
+    check_double("Log(di)", Log.invoke(di), max_ulp=libm_ulp(1))
     check_double("Power(di,2.0)", Power.invoke(di, 2.0))
     check_double("Power(di,0.5)", Power.invoke(di, 0.5))
     check_double("Power(di,-1.0)", Power.invoke(di, -1.0))

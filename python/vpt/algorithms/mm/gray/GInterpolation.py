@@ -6,10 +6,9 @@ two (by now already-filled) endpoints, then recurses on each half."""
 
 from __future__ import annotations
 
-import math
 import traceback
 
-from ...._javacompat import jint
+from ...._javacompat import jint, jpow
 from ....Algorithm import Algorithm
 from ....GlobalException import GlobalException
 from ....Image import Image
@@ -33,7 +32,7 @@ class GInterpolation(Algorithm):
         if self.length < 0:
             raise GlobalException("Invalid sequence length!")
 
-        length = 2 * jint(math.pow(2.0, self.length)) + 1
+        length = 2 * jint(jpow(2.0, self.length)) + 1
 
         self.output = [None] * length
 

@@ -10,7 +10,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jexp_arr
+from ..._javacompat import jexp, jexp_arr
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -44,9 +44,12 @@ class EuclideanDistanceFromRGBColor(Algorithm):
         # accumulation, and the sum of squares is never negative so a plain
         # np.sqrt (no jsqrt guard) is safe.
         rgb = self.input.getDoubleArray().reshape(ydim, xdim, cdim)
-        d0 = (rgb[:, :, 0] - self.red) ** 2
-        d1 = (rgb[:, :, 1] - self.green) ** 2
-        d2 = (rgb[:, :, 2] - self.blue) ** 2
+        e0 = rgb[:, :, 0] - self.red
+        d0 = e0 * e0
+        e1 = rgb[:, :, 1] - self.green
+        d1 = e1 * e1
+        e2 = rgb[:, :, 2] - self.blue
+        d2 = e2 * e2
         distance = np.sqrt(d0 + d1 + d2) / math.sqrt(3.0)
         if self.nonlinear:
             # Array twin of _sigma -- math.exp is scalar-only, np.exp is the
@@ -59,7 +62,7 @@ class EuclideanDistanceFromRGBColor(Algorithm):
 
     @staticmethod
     def _sigma(z: float) -> float:
-        return 1.0 / (1.0 + math.exp(-5.0 * (z - 0.5)))
+        return 1.0 / (1.0 + jexp(-5.0 * (z - 0.5)))
 
     @staticmethod
     def invoke(

@@ -4,8 +4,8 @@ entropy is at least ``threshold``."""
 
 from __future__ import annotations
 
-import math
 
+from ......_javacompat import jlog10
 from .Attribute import Attribute
 
 
@@ -21,10 +21,10 @@ class Entropy(Attribute):
             histo[i] /= len(pixels)
 
         entropy = 0.0
-        logBaseChange = math.log10(2.0)
+        logBaseChange = jlog10(2.0)
         for p in pixels:
             q = img.getXYByte(p.x, p.y)
-            entropy += histo[q] * (math.log10(histo[q]) / logBaseChange)
+            entropy += histo[q] * (jlog10(histo[q]) / logBaseChange)
 
         if entropy < 0.0:
             entropy *= -1.0

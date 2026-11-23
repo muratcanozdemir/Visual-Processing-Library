@@ -13,12 +13,11 @@ included in ``inputFields``."""
 
 from __future__ import annotations
 
-import math
 import traceback
 
 import numpy as np
 
-from ..._javacompat import jexp_arr
+from ..._javacompat import jexp, jexp_arr
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -70,7 +69,7 @@ class DistanceFromHSYColor(Algorithm):
 
     @staticmethod
     def _sigma(z: float) -> float:
-        return 1.0 / (1.0 + math.exp(-10.0 * (z - 0.35)))
+        return 1.0 / (1.0 + jexp(-10.0 * (z - 0.35)))
 
     @staticmethod
     def invoke(image: Image, red: float, green: float, blue: float) -> Image | None:

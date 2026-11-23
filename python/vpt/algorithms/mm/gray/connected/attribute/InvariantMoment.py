@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import sys
 
+from ......_javacompat import jpow
 from .Attribute import Attribute
 
 
@@ -41,7 +42,7 @@ class InvariantMoment(Attribute):
         output = 0.0
         for p in pixels:
             tmp = img.getXYDouble(p.x, p.y)
-            output += (p.x + 1) ** momentX * (p.y + 1) ** momentY * tmp
+            output += jpow(float(p.x + 1), momentX) * jpow(float(p.y + 1), momentY) * tmp
         return output
 
     def _centralMoment(self, pixels, img, momentX: int, momentY: int) -> float:
@@ -55,7 +56,7 @@ class InvariantMoment(Attribute):
         output = 0.0
         for p in pixels:
             tmp = img.getXYDouble(p.x, p.y)
-            output += (p.x + 1 - centroidX) ** momentX * (p.y + 1 - centroidY) ** momentY * tmp
+            output += jpow(p.x + 1 - centroidX, momentX) * jpow(p.y + 1 - centroidY, momentY) * tmp
         return output
 
     def _spatialMoment(self, pixels, img, momentX: int, momentY: int) -> float:
@@ -66,7 +67,7 @@ class InvariantMoment(Attribute):
         m00 = self._moment(pixels, img, 0, 0)
         alpha = (momentX + momentY) / 2.0 + 1.0
 
-        m00 = m00**alpha
+        m00 = jpow(m00, alpha)
         return muXY / m00
 
     def _invariantMoment(self, pixels, img, order: int) -> float:

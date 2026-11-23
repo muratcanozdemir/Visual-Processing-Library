@@ -60,9 +60,12 @@ class EuclideanDistanceFromLABColor(Algorithm):
         # Same left-to-right 3-term accumulation as Distance.euclidean,
         # vectorized -- see EuclideanDistanceFromRGBColor for the reasoning.
         p = self.input.getDoubleArray().reshape(ydim, xdim, cdim)
-        d0 = (p[:, :, 0] - q[0]) ** 2
-        d1 = (p[:, :, 1] - q[1]) ** 2
-        d2 = (p[:, :, 2] - q[2]) ** 2
+        e0 = p[:, :, 0] - q[0]
+        d0 = e0 * e0
+        e1 = p[:, :, 1] - q[1]
+        d1 = e1 * e1
+        e2 = p[:, :, 2] - q[2]
+        d2 = e2 * e2
         distance = np.sqrt(d0 + d1 + d2) / math.sqrt(3.0)
 
         self.output.setDoubleArray(distance.reshape(-1))

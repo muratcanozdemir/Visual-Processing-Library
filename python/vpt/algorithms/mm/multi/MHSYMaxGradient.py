@@ -16,12 +16,11 @@ further investigation. Transcribed exactly as written.
 
 from __future__ import annotations
 
-import math
 import traceback
 
 import numpy as np
 
-from ...._javacompat import jexp_arr
+from ...._javacompat import jexp, jexp_arr
 from ....Algorithm import Algorithm
 from ....ByteImage import ByteImage
 from ....GlobalException import GlobalException
@@ -143,8 +142,8 @@ class MHSYMaxGradient(Algorithm):
             if 0 <= _x < self.xdim and 0 <= _y < self.ydim:
                 tmp = Tools.hueDistance(centralHue, self.input.getXYCDouble(_x, _y, 2)) * 2.0
                 tmp *= 1.0 / (
-                    (1.0 + math.exp(-10.0 * (self.input.getXYCDouble(_x, _y, 1) - 0.35)))
-                    * (1.0 + math.exp(-10.0 * (centralSaturation - 0.35)))
+                    (1.0 + jexp(-10.0 * (self.input.getXYCDouble(_x, _y, 1) - 0.35)))
+                    * (1.0 + jexp(-10.0 * (centralSaturation - 0.35)))
                 )
                 if tmp > maxDist:
                     maxDist = tmp

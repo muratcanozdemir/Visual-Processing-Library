@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 
-from .._javacompat import jatan, jdiv
+from .._javacompat import jatan, jcos, jdiv, jexp, jsin
 
 
 class ComplexNumber:
@@ -47,8 +47,8 @@ class ComplexNumber:
     # ------------------------------------------------------------------
     @staticmethod
     def cExp(z: "ComplexNumber") -> "ComplexNumber":
-        x = ComplexNumber(math.exp(z.real), 0.0)
-        y = ComplexNumber(math.cos(z.imag), math.sin(z.imag))
+        x = ComplexNumber(jexp(z.real), 0.0)
+        y = ComplexNumber(jcos(z.imag), jsin(z.imag))
         return ComplexNumber.cMult(x, y)
 
     @staticmethod

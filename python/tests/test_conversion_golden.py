@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from _platform import libm_ulp
 from vpt import ByteImage, DoubleImage
 from vpt.algorithms.conversion import (
     HSY2RGB,
@@ -134,8 +135,8 @@ def test_conversion_matches_java_oracle():
     # specified to be bit-reproducible across platforms -- JDK 21/x86_64
     # Linux vs. glibc's acos disagree by up to 2 ulp at some inputs; see
     # python/README.md "Known divergence".
-    check_double("RGB2HSY(rgb)", RGB2HSY.invoke(rgb), max_ulp=2)
-    check_double("RGB2NUHSY733(rgb)", RGB2NUHSY733.invoke(rgb), max_ulp=2)
+    check_double("RGB2HSY(rgb)", RGB2HSY.invoke(rgb), max_ulp=libm_ulp(2))
+    check_double("RGB2NUHSY733(rgb)", RGB2NUHSY733.invoke(rgb), max_ulp=libm_ulp(2))
     check_double("NonUniformHSY733(rgb)", NonUniformHSY733.invoke(rgb))
     check_double("NonUniformHSY744(rgb)", NonUniformHSY744.invoke(rgb))
     check_double("NonUniformHSY833(rgb)", NonUniformHSY833.invoke(rgb))
@@ -161,7 +162,7 @@ def test_conversion_matches_java_oracle():
     check_double(
         "DistanceFromHSYColor(hsy,0.8,0.2,0.1)",
         DistanceFromHSYColor.invoke(hsy, 0.8, 0.2, 0.1),
-        max_ulp=2,
+        max_ulp=libm_ulp(2),
     )
 
     check_double(

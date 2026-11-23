@@ -12,7 +12,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jpow_arr
+from ..._javacompat import jpow, jpow_arr
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -83,15 +83,15 @@ class LAB2XYZ(Algorithm):
 
         xyz = [0.0, 0.0, 0.0]
         if fy > delta:
-            xyz[1] = Yn * fy**3.0
+            xyz[1] = Yn * jpow(fy, 3.0)
         else:
             xyz[1] = (fy - _DELTA_OFFSET) * 3.0 * delta * delta * Yn
         if fx > delta:
-            xyz[0] = Xn * fx**3.0
+            xyz[0] = Xn * jpow(fx, 3.0)
         else:
             xyz[0] = (fx - _DELTA_OFFSET) * 3.0 * delta * delta * Xn
         if fz > delta:
-            xyz[2] = Zn * fz**3.0
+            xyz[2] = Zn * jpow(fz, 3.0)
         else:
             xyz[2] = (fz - _DELTA_OFFSET) * 3.0 * delta * delta * Zn
 

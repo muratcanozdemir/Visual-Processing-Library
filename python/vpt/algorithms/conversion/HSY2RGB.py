@@ -9,7 +9,18 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jcos_arr, jdiv, jdiv_arr, jint, jint_arr, jround, jround_arr, jsin_arr
+from ..._javacompat import (
+    jcos,
+    jcos_arr,
+    jdiv,
+    jdiv_arr,
+    jint,
+    jint_arr,
+    jround,
+    jround_arr,
+    jsin,
+    jsin_arr,
+)
 from ...Algorithm import Algorithm
 from ...ByteImage import ByteImage
 from ...GlobalException import GlobalException
@@ -74,10 +85,10 @@ class HSY2RGB(Algorithm):
         Hstar = H - k * _PI_OVER_3
         # Java double division: a zero denominator (Hstar hitting exactly
         # pi/3's midpoint) yields Infinity/NaN, not ZeroDivisionError.
-        C = jdiv(math.sqrt(3.0) * S, 2.0 * math.sin(_TWO_PI_OVER_3 - Hstar))
+        C = jdiv(math.sqrt(3.0) * S, 2.0 * jsin(_TWO_PI_OVER_3 - Hstar))
 
-        C1 = C * math.cos(H)
-        C2 = -1.0 * C * math.sin(H)
+        C1 = C * jcos(H)
+        C2 = -1.0 * C * jsin(H)
 
         R = 1.0 * Y + 0.701 * C1 + 0.2730866773266931 * C2
         G = 1.0 * Y - 0.299 * C1 - 0.3042635918629327 * C2

@@ -19,7 +19,7 @@ from __future__ import annotations
 import math
 import traceback
 
-from ..._javacompat import Point, jdiv
+from ..._javacompat import Point, jdiv, jpow
 from ...Algorithm import Algorithm
 from ...BooleanImage import BooleanImage
 from ...GlobalException import GlobalException
@@ -151,7 +151,7 @@ class DominantPointsDetection(Algorithm):
             0.5
             * (p1.x * p2.y + p2.x * p.y + p.x * p1.y - p2.x * p1.y - p.x * p2.y - p1.x * p.y)
         )
-        bottom = math.sqrt((p1.x - p2.x) ** 2.0 + (p1.y - p2.y) ** 2.0)
+        bottom = math.sqrt(jpow(float(p1.x - p2.x), 2.0) + jpow(float(p1.y - p2.y), 2.0))
         return jdiv(area, bottom) * 2.0
 
     @staticmethod

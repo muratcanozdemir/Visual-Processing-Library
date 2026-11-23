@@ -238,10 +238,13 @@ def test_shape_matches_java_oracle():
         ContourPointDistributionHistogram.invoke(shape, 4),
     )
 
-    # ZernikeMoments chains Math.atan2/cos/sin/pow per pixel per moment, the
-    # same fdlibm-vs-glibc divergence family as statistical.ZernikeMoment,
-    # but summed over many more terms -- the drift compounds further (up to
-    # ~7 ulp observed here vs. 2 ulp for a single ZernikeMoment call).
+    # ZernikeMoments chains Math.atan2/cos/sin/pow over ~100,000 calls (8,362
+    # distinct arguments). Replayed through the JVM, 9 of them differ from
+    # the port's correctly rounded values -- 6 sin, 2 cos, 1 pow, all
+    # cases where HotSpot's x86_64 intrinsics misround (atan2, fdlibm in
+    # both, matches every time) -- and summing those terms leaves up to
+    # ~6 ulp in 5 of the 32 moments. Unlike the old platform-libm drift,
+    # this is the same on every OS and CPU; see python/src/jmath.rs.
     zm = ZernikeMoments.invoke(shape)
     zm_row = golden.get("ZernikeMoments(shape)")
     if zm_row is None:
