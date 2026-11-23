@@ -1,0 +1,104 @@
+name: release-please
+
+# Python releases (python-v* tags). The Java jar keeps its own v* tags and
+# release.yml; release-please only manages the `python` package.
+#
+# On every push to main, release-please keeps a release PR open that bumps
+# python/pyproject.toml, uv.lock's vpt entry, .release-please-manifest.json
+# and python/CHANGELOG.md together, from conventional commit messages since
+# the last python-v* tag (feat: -> minor before 1.0, fix:/perf: -> patch).
+# Merging that PR makes release-please tag python-vX.Y.Z and create the
+# GitHub release; the publish job below then builds, re-verifies and
+# attaches the wheel, sdist and checksums.
+#
+# workflow_dispatch with a tag re-runs only the publish job for an existing
+# release (e.g. if publishing failed after the tag was created).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing python-v* tag to (re)build and attach assets to"
+        required: true
+
+permissions:
+  contents: write        # tag, release, and asset upload
+  pull-requests: write   # the release PR
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs['python--release_created'] }}
+      tag_name: ${{ steps.rp.outputs['python--tag_name'] }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@v5
+        with:
+          # PRs opened with the default GITHUB_TOKEN don't trigger other
+          # workflows, so the release PR gets no python-ci run. Set a
+          # RELEASE_PLEASE_TOKEN secret (fine-grained PAT or GitHub App
+          # token) to have CI run on it; the default token works otherwise.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    needs: release-please
+    if: >-
+      always() &&
+      ((github.event_name == 'push' && needs.release-please.outputs.release_created == 'true') ||
+       github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || needs.release-please.outputs.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: python/uv.lock
+
+      - name: Tag matches the version in pyproject.toml
+        run: |
+          VERSION="$(uv version --short)"
+          echo "tag=$TAG pyproject.toml=$VERSION"
+          [ "$TAG" = "python-v$VERSION" ] || { echo "::error::$TAG does not match pyproject.toml version $VERSION"; exit 1; }
+
+      - name: Run golden test suite
+        run: uv run --locked --group test pytest -q
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      # A tag must never publish artifacts that were not verified at runtime:
+      # install the built wheel into a clean venv and re-run the suite
+      # against it, from tests/ so `import vpt` can't resolve to the source.
+      - name: Verify built wheel installs and passes tests
+        run: |
+          uv venv /tmp/wheel-check
+          uv pip install --python /tmp/wheel-check dist/*.whl pytest pytest-cov
+          cd tests
+          /tmp/wheel-check/bin/python -m pytest -q
+
+      - name: Checksums
+        run: ( cd dist && sha256sum ./* > SHA256SUMS )
+
+      - name: Attach assets to the release
+        run: gh release upload "$TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --clobber

@@ -12,15 +12,37 @@ From a release (`.whl` attached to each `python-v*` GitHub release):
 pip install vpt-<version>-py3-none-any.whl
 ```
 
-From source, with the test extras:
+From source, with [uv](https://docs.astral.sh/uv/) (installs the `dev`
+dependency group: pytest, pytest-cov, ruff):
 
 ```sh
 cd python
-pip install -e ".[test]"
-pytest
+uv sync
+uv run pytest
 ```
 
 Requires Python 3.11+ and NumPy.
+
+## Releasing
+
+Versions are managed by [release-please](https://github.com/googleapis/release-please)
+(`release-please-config.json` at the repo root). Don't bump the version by
+hand: on every push to `main` it keeps a release PR open that bumps
+`pyproject.toml`, `uv.lock`'s `vpt` entry, `.release-please-manifest.json`
+and `CHANGELOG.md` together, from
+[conventional commit](https://www.conventionalcommits.org/) messages since
+the last `python-v*` tag. With squash merges, that's the **PR title**:
+
+| Title prefix | Effect (while < 1.0) |
+|---|---|
+| `feat:` / `feat!:` | minor bump (0.1.0 -> 0.2.0) |
+| `fix:` / `perf:` | patch bump (0.1.0 -> 0.1.1) |
+| `docs:`, `test:`, `build:`, `ci:`, `chore:`, `refactor:` | no release on their own |
+
+Merging the release PR tags `python-vX.Y.Z` and creates the GitHub release;
+`.github/workflows/release-please.yml` then builds the wheel and sdist,
+re-runs the suite against the installed wheel, and attaches them with
+`SHA256SUMS`. CI fails if the three version locations ever disagree.
 
 ## Quick start
 
@@ -312,8 +334,8 @@ a convention that neither library guarantees.
 ## Tests
 
 ```sh
-pip install -e '.[test]'
-python -m pytest              # no JDK needed; goldens are committed
+uv sync
+uv run pytest                 # no JDK needed; goldens are committed
 ```
 
 Regenerating goldens requires the Java build:

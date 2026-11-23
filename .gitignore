@@ -5,6 +5,7 @@ oracle/*.class
 release-notes.md
 
 # Python port
+.venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
