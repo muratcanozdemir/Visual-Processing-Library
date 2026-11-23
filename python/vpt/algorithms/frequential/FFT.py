@@ -52,6 +52,25 @@ class FFT(Algorithm):
         n = 0
         while 2.0**n < max(xdim, ydim):
             n += 1
+
+        # Shortcut for MAG, the only output type any caller uses. As the
+        # module docstring explains, once the padded transform size 2**n is
+        # at least 2 every butterfly is built from cSum/cDiff's fresh-zero
+        # return values, so every output element is a signed zero whatever
+        # the input (NaN/Infinity included), and its magnitude
+        # sqrt(+-0**2 + +-0**2) is exactly +0.0. DoubleImage(input, False)
+        # is zero-filled, so it already holds those values; skip the
+        # O(size**2 log size) ComplexNumber work. shiftOrigin still runs, so
+        # the result is the same object the full path builds. Size 1 (a 1x1
+        # image) is excluded: there the base case returns the pixel itself.
+        # The other output types expose the zeros' signs (REAL/IMAG parts,
+        # phases), so they keep the full transcription.
+        if self.outputType == MAG and 2.0**n >= 2.0:
+            self.output = [DoubleImage(self.input, False)]
+            if self.shifted:
+                self.output[0] = Tools.shiftOrigin(self.output[0])
+            return
+
         for i in range(size):
             pixels[i] = self.input.getDouble(i) * 2.0**n
 

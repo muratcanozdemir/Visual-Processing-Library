@@ -897,8 +897,10 @@ and the attribute-predicate files lowest (real but marginal value).
 
 ## 8. Profiler-driven hotspot scan (2026-11-23, fast-anything)
 
-**Status:** `[ ]` findings only; nothing implemented yet. Three real
-targets, each with a recommended fix below.
+**Status:** `[x]` all three implemented in pure Python, each bit-identical
+to the code it replaced (2026-11-23); full suite 9.7s -> 3.7s. A verified
+Rust port of 8.2's kernel exists locally but is **not shipped** -- see
+8.2.
 
 **How it was found.** [`fast-anything`](https://github.com/EL4CTEO/fast-anything)
 v0.8.1 (commit `445abd1`, reviewed before use) profiled the golden test
@@ -937,37 +939,62 @@ return a fresh zero, so every butterfly is `0+0i` and the output is all
 zeros for any input. Every caller asks for `outputType=MAG` (2), whose
 values are then exactly `+0.0` everywhere (magnitude of a signed zero is
 `+0.0`; `shiftOrigin` of zeros is zeros).
-**Recommended fix — pure Python, not Rust:** short-circuit the `MAG`
-output to a `+0.0` image of the input's dimensions, keeping the full
-transcription for `REAL`/`REAL_IMAG`/`MAG_PHASE`, where the signed zeros
-the butterflies produce (`0 * negative twiddle = -0.0`) would be observable.
-Verify against the full transcription over many shapes (incl. non-powers
-of two) and values (incl. NaN/inf). Porting it to Rust would spend effort
+**Done — pure Python, not Rust:** `MAG` output now short-circuits to the
+zero-filled `DoubleImage(input, False)` (then `shiftOrigin` if `shifted`,
+as before), keeping the full transcription for `REAL`/`REAL_IMAG`/
+`MAG_PHASE`, where the signed zeros the butterflies produce
+(`0 * negative twiddle = -0.0`) are observable. **Correction to the
+original finding:** when the padded transform size is 1 (a 1x1 image) the
+recursion's base case returns the pixel itself, so the output is *not*
+zero there; the shortcut requires a padded size >= 2. Verified bit-for-bit
+against the full transcription on 624 outputs (all four image types,
+1x1/1x2/2x1/odd/multi-channel sizes, NaN/+-inf/-0.0 pixels, both `shifted`
+values, all four output types). Porting it to Rust would have spent effort
 re-implementing a bug.
 
 ### 8.2 `mm/binary/path/BPathOpening.py`
 **Share:** ~17% (1,279 calls: `mm/gray/path/GPathOpening` calls it once per
 gray level, and `plants/VeinProfile` (~15%) is `GPathOpening` underneath).
 **Why slow:** memoized per-pixel recursion in four directions.
-**Recommended fix — the one good fast-anything candidate:** integer and
-boolean arithmetic only, so fast-anything's 1e-9 float tolerance can't mask
-a difference and its replay check is effectively exact. Port as an optional
-native fast path, keep the Python reference, and require the golden suite
-to pass with it enabled.
+**Done in Python:** the 8 memoized recursive helpers compute a longest path
+over a DAG, a pure function of the foreground mask, so they're replaced by
+one module-level kernel, `path_run_lengths(mask, xdim, ydim)`, that
+evaluates the same recurrence iteratively in a dependency-respecting scan
+order per direction. Everything around it (mask read like `getXYBoolean`,
+`ByteImage` storage wrapping mod 256, `Maximum`, `Threshold`) is unchanged.
+Identical to the recursive code on 564 cases (Boolean/Byte/Integer/Double
+inputs incl. 3-channel, random/line/full masks, runs > 255). 2.4x faster,
+and it can no longer hit Python's recursion limit on large images.
+
+**Rust port (fast-anything), verified but not shipped.** The kernel takes
+plain data, so fast-anything could port it: `fast-anything port
+vpt.algorithms.mm.binary.path.BPathOpening.path_run_lengths --agent claude`
+produced a PyO3 crate (reviewed: same scan orders and neighbours, zero-
+padded border, no `build.rs`, only `pyo3`) on the first attempt; 508/508
+replayed calls identical (integer results, so the 1e-9 tolerance is moot).
+With it enabled, the golden suite passes and the 564-case comparison still
+matches. Speed: `BPathOpening` 128x128 120ms (recursive) -> 52ms (Python
+kernel) -> 4ms (Rust); `GPathOpening` 64x64 2.75s -> 0.23s. It lives in
+`python/.fast/` (gitignored) and is switched off in committed code: the
+`enable` shim imports the extension from that local path, so shipping it
+would put a hook in every wheel that only works in one checkout. Shipping
+it for real needs a native build (maturin, per-platform wheels) -- an open
+decision. Locally: `fast-anything enable <id>` / `disable <id>`.
 
 ### 8.3 `flatzones/angular/AngularQFZ2.py`
 **Share:** ~7%.
 **Why slow:** `_createQCC` recomputes the maximum `Tools.hueDistance` over
 *every pair* in the growing zone each time it adds a pixel -- O(n^2) per
 step, so O(n^3) per zone.
-**Recommended fix — pure Python, exact:** keep a running `maxDist` and, on
-each added pixel, compare only the new point against the existing ones.
-The zone list only grows within one `_createQCC` call and `max` involves no
-rounding, so the result is identical: O(n) per step. `hueDistance` is
-`abs`/compare/`1.0 - a`, and a NaN distance is skipped by the `>`
-comparison either way. Keep the zone-growth order unchanged. (Also
-vectorizable with numpy for the inner loop, but the incremental max is the
-real win.)
+**Done — pure Python, exact:** a running `maxDist`; each added pixel is
+compared only against the points already in the zone. The zone list only
+grows within one `_createQCC` call (the caller clears it before every call
+and retry) and `max` involves no rounding, so the result is identical:
+O(n) per step. `hueDistance` is `abs`/compare/`1.0 - a`, symmetric, and a
+NaN distance is skipped by the `>` comparison either way. Identical labels
+on 80 cases (random/banded/wraparound/flat hue fields, alpha/omega incl.
+retry-forcing ones), ~9x faster; the running max matched the full rescan on
+3000 random value lists with NaN/+-inf/signed zeros.
 
 ---
 
