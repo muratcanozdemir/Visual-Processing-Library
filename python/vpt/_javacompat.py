@@ -453,14 +453,16 @@ def jpow_arr(a: np.ndarray, b: float) -> np.ndarray:
     special = nan_a | inf_a | zero_a | neg_noninteger
     out = np.empty_like(a)
     generic_idx = np.flatnonzero(~special)
+    # `.flat` so any array shape works (flatnonzero yields flat indices).
+    a_flat, out_flat = a.flat, out.flat
     for j in generic_idx:
-        av = float(a[j])
+        av = float(a_flat[j])
         try:
-            out[j] = math.pow(av, b)
+            out_flat[j] = math.pow(av, b)
         except OverflowError:
-            out[j] = -math.inf if (av < 0.0 and b_odd) else math.inf
+            out_flat[j] = -math.inf if (av < 0.0 and b_odd) else math.inf
         except ValueError:
-            out[j] = math.nan
+            out_flat[j] = math.nan
 
     out = np.where(neg_noninteger, math.nan, out)
     out = np.where(zero_a, np.where(neg_zero_a, neg_zero_val, pos_zero_val), out)

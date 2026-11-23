@@ -91,6 +91,10 @@ def test_point_matches_java_oracle():
             return
         for g, a in zip(g_vals, a_vals):
             want = parse_double(g)
+            if want != want:  # NaN: golden text carries no sign/payload bits
+                if a == a:
+                    failures.append(f"{name}: value mismatch python={a} java={g}")
+                continue
             if bits(a) == bits(want):
                 continue
             if (

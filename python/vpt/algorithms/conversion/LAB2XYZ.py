@@ -12,6 +12,7 @@ import traceback
 
 import numpy as np
 
+from ..._javacompat import jpow_arr
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -42,7 +43,9 @@ class LAB2XYZ(Algorithm):
         # pixel's own value -- vectorizes losslessly. ``x**3.0`` (an
         # integer-valued exponent) stays real for a negative base under
         # numpy too, so no errstate guard is needed (unlike XYZ2LAB's
-        # non-integer cube root).
+        # non-integer cube root). The cube still goes through jpow_arr
+        # (per-element math.pow) rather than numpy `**`, whose SIMD kernels
+        # on AVX-512 CPUs are not bit-identical to Java's Math.pow.
         lab = self.input.getDoubleArray().reshape(ydim, xdim, cdim)
         L, A, B = lab[:, :, 0], lab[:, :, 1], lab[:, :, 2]
 
@@ -55,13 +58,13 @@ class LAB2XYZ(Algorithm):
 
         xyz = np.empty((ydim, xdim, cdim), dtype=np.float64)
         xyz[:, :, 1] = np.where(
-            fy > delta, Yn * fy**3.0, (fy - _DELTA_OFFSET) * 3.0 * delta * delta * Yn
+            fy > delta, Yn * jpow_arr(fy, 3.0), (fy - _DELTA_OFFSET) * 3.0 * delta * delta * Yn
         )
         xyz[:, :, 0] = np.where(
-            fx > delta, Xn * fx**3.0, (fx - _DELTA_OFFSET) * 3.0 * delta * delta * Xn
+            fx > delta, Xn * jpow_arr(fx, 3.0), (fx - _DELTA_OFFSET) * 3.0 * delta * delta * Xn
         )
         xyz[:, :, 2] = np.where(
-            fz > delta, Zn * fz**3.0, (fz - _DELTA_OFFSET) * 3.0 * delta * delta * Zn
+            fz > delta, Zn * jpow_arr(fz, 3.0), (fz - _DELTA_OFFSET) * 3.0 * delta * delta * Zn
         )
 
         self.output.setDoubleArray(xyz.reshape(-1))
