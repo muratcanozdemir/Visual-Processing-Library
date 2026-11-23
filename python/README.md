@@ -6,14 +6,17 @@ against golden values dumped from it.
 
 ## Install
 
-From a release (`.whl` attached to each `python-v*` GitHub release):
+From a release: each `python-v*` GitHub release has a wheel per platform
+(Linux x86_64/aarch64, macOS arm64/x86_64, Windows x64; each covers
+CPython 3.11+) and the sdist. Pick the wheel for your platform:
 
 ```sh
-pip install vpt-<version>-py3-none-any.whl
+pip install vpt-<version>-cp311-abi3-<platform>.whl
 ```
 
-From source, with [uv](https://docs.astral.sh/uv/) (installs the `dev`
-dependency group: pytest, pytest-cov, ruff):
+From source, with [uv](https://docs.astral.sh/uv/) and a Rust toolchain
+([rustup](https://rustup.rs/)); `uv sync` builds the extension with maturin
+and installs the `dev` dependency group (pytest, pytest-cov, ruff):
 
 ```sh
 cd python
@@ -22,6 +25,17 @@ uv run pytest
 ```
 
 Requires Python 3.11+ and NumPy.
+
+### Native kernels
+
+A few hot loops (path openings, area openings/closings, `ComputeSEs`) have
+Rust implementations in `src/`, compiled into the `vpt._native` extension.
+They return exactly what the Python code returns -- integer/boolean work
+only, checked by `tests/test_native_parity.py` -- and are 30-45x faster
+on those algorithms. The Python code stays the reference and the fallback:
+set `VPT_PURE_PYTHON=1` to run without the extension, or
+`VPT_REQUIRE_NATIVE=1` to fail if it can't be loaded. See
+`IMPROVEMENTS.md` section 8.
 
 ## Releasing
 
@@ -40,8 +54,9 @@ the last `python-v*` tag. With squash merges, that's the **PR title**:
 | `docs:`, `test:`, `build:`, `ci:`, `chore:`, `refactor:` | no release on their own |
 
 Merging the release PR tags `python-vX.Y.Z` and creates the GitHub release;
-`.github/workflows/release-please.yml` then builds the wheel and sdist,
-re-runs the suite against the installed wheel, and attaches them with
+`.github/workflows/release-please.yml` then builds the platform wheels and
+the sdist (`python-wheels.yml`, the same workflow CI runs), re-runs the
+suite against each installed artifact, and attaches them with
 `SHA256SUMS`. CI fails if the three version locations ever disagree.
 
 ## Quick start

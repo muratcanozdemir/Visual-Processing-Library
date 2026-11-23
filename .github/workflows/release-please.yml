@@ -8,8 +8,9 @@ name: release-please
 # and python/CHANGELOG.md together, from conventional commit messages since
 # the last python-v* tag (feat: -> minor before 1.0, fix:/perf: -> patch).
 # Merging that PR makes release-please tag python-vX.Y.Z and create the
-# GitHub release; the publish job below then builds, re-verifies and
-# attaches the wheel, sdist and checksums.
+# GitHub release; the dist job then builds and re-verifies the platform
+# wheels and the sdist (python-wheels.yml, the same workflow python-ci
+# runs), and publish attaches them with checksums.
 #
 # workflow_dispatch with a tag re-runs only the publish job for an existing
 # release (e.g. if publishing failed after the tag was created).
@@ -50,12 +51,19 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  publish:
+  dist:
     needs: release-please
     if: >-
       always() &&
       ((github.event_name == 'push' && needs.release-please.outputs.release_created == 'true') ||
        github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/python-wheels.yml
+    with:
+      ref: ${{ github.event.inputs.tag || needs.release-please.outputs.tag_name }}
+
+  publish:
+    needs: [release-please, dist]
+    if: always() && needs.dist.result == 'success'
     runs-on: ubuntu-latest
     env:
       TAG: ${{ github.event.inputs.tag || needs.release-please.outputs.tag_name }}
@@ -70,10 +78,6 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.4.0
-        with:
-          python-version: "3.12"
-          enable-cache: true
-          cache-dependency-glob: python/uv.lock
 
       - name: Tag matches the version in pyproject.toml
         run: |
@@ -81,24 +85,15 @@ jobs:
           echo "tag=$TAG pyproject.toml=$VERSION"
           [ "$TAG" = "python-v$VERSION" ] || { echo "::error::$TAG does not match pyproject.toml version $VERSION"; exit 1; }
 
-      - name: Run golden test suite
-        run: uv run --locked --group test pytest -q
-
-      - name: Build sdist and wheel
-        run: uv build
-
-      # A tag must never publish artifacts that were not verified at runtime:
-      # install the built wheel into a clean venv and re-run the suite
-      # against it, from tests/ so `import vpt` can't resolve to the source.
-      - name: Verify built wheel installs and passes tests
-        run: |
-          uv venv /tmp/wheel-check
-          uv pip install --python /tmp/wheel-check dist/*.whl pytest pytest-cov
-          cd tests
-          /tmp/wheel-check/bin/python -m pytest -q
+      # The wheels and sdist dist built and tested; nothing is rebuilt here.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: vpt-*
+          merge-multiple: true
+          path: python/dist
 
       - name: Checksums
-        run: ( cd dist && sha256sum ./* > SHA256SUMS )
+        run: ( cd dist && ls -l && sha256sum ./* > SHA256SUMS )
 
       - name: Attach assets to the release
         run: gh release upload "$TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --clobber

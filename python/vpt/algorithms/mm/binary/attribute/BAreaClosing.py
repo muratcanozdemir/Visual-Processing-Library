@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import traceback
 
+import numpy as np
+
 from ....._javacompat import Point
+from ..... import _accel
 from .....Algorithm import Algorithm
 from .....BooleanImage import BooleanImage
 from .....GlobalException import GlobalException
@@ -57,6 +60,8 @@ class BAreaClosing(Algorithm):
 
     def execute(self) -> None:
         self.output = self.input.newInstance(True)
+        if self._executeNative():
+            return
         self._mask = BooleanImage(self.input, True)
 
         self.xdim = self.input.getXDim()
@@ -69,6 +74,27 @@ class BAreaClosing(Algorithm):
                     s.clear()
                     s.append(Point(x, y))
                     self._filter(s)
+
+    def _executeNative(self) -> bool:
+        """The same result from the Rust kernel (``python/src/area.rs``),
+        when available: the pixels of every 8-connected background component
+        of fewer than ``area`` pixels (read through the flat index
+        ``x + xdim * y``, like ``getXYBoolean``) are set to True. Which
+        pixels those are doesn't depend on the order the flood fills run
+        in. Returns False to fall back to the Python below."""
+        native = _accel.native
+        if native is None or type(self.area) is not int:
+            return False
+        self.xdim = self.input.getXDim()
+        self.ydim = self.input.getYDim()
+        n = self.xdim * self.ydim
+        mask = ~self.input.getBooleanArray()[:n]
+        small = native.small_components(
+            mask.astype(np.uint8).tobytes(), self.xdim, self.ydim, _accel.clamp_i64(self.area)
+        )
+        idx = np.flatnonzero(np.frombuffer(small, dtype=np.uint8))
+        _accel.set_booleans(self.output, idx, True)
+        return True
 
     @staticmethod
     def invoke(image: Image, area: int) -> Image | None:

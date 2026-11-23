@@ -1,7 +1,9 @@
 [build-system]
-# >=1.27 for PEP 639: the SPDX `license` string and `license-files` below.
-requires = ["hatchling>=1.27"]
-build-backend = "hatchling.build"
+# maturin builds the pure-Python `vpt` package plus the Rust kernels in
+# src/ (Cargo.toml) as the `vpt._native` extension. >=1.9 for PEP 639
+# (`license-files`).
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
 
 [project]
 name = "vpt"
@@ -37,6 +39,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Rust",
     "Topic :: Scientific/Engineering :: Image Processing",
     "Typing :: Typed",
 ]
@@ -55,13 +58,30 @@ test = ["pytest>=7", "pytest-cov>=4"]
 lint = ["ruff>=0.6"]
 dev = [{ include-group = "test" }, { include-group = "lint" }]
 
-[tool.hatch.build.targets.wheel]
-# Everything under vpt/ ships, including the PEP 561 `py.typed` marker.
-packages = ["vpt"]
+[tool.maturin]
+# Mixed Rust/Python layout: the vpt/ package ships as-is (including the PEP
+# 561 `py.typed` marker), with the compiled kernels added as vpt/_native.
+# The pure-Python code stays the reference and the fallback (vpt/_accel.py).
+module-name = "vpt._native"
+python-packages = ["vpt"]
+# Cargo.toml, Cargo.lock, src/, pyproject.toml, the readme and
+# license-files are always in the sdist.
+include = [
+    { path = "tests/**/*", format = "sdist" },
+    { path = "CHANGELOG.md", format = "sdist" },
+    { path = "IMPROVEMENTS.md", format = "sdist" },
+]
+exclude = ["**/__pycache__/**", "**/*.pyc"]
 
-[tool.hatch.build.targets.sdist]
-# pyproject.toml, the readme and license-files are always included.
-include = ["vpt", "tests", "CHANGELOG.md", "IMPROVEMENTS.md"]
+[tool.uv]
+# Rebuild the extension in `uv sync`/`uv run` when the Rust code changes
+# (uv otherwise only watches pyproject.toml).
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "Cargo.lock" },
+    { file = "src/**/*.rs" },
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -897,10 +897,11 @@ and the attribute-predicate files lowest (real but marginal value).
 
 ## 8. Profiler-driven hotspot scan (2026-11-23, fast-anything)
 
-**Status:** `[x]` all three implemented in pure Python, each bit-identical
-to the code it replaced (2026-11-23); full suite 9.7s -> 3.7s. A verified
-Rust port of 8.2's kernel exists locally but is **not shipped** -- see
-8.2.
+**Status:** `[x]` 8.1-8.3 implemented in pure Python, each bit-identical
+to the code it replaced (2026-11-23); full suite 9.7s -> 3.7s. Second scan
+the same day: the remaining hotspots (8.2's kernel, 8.4, 8.5) now have
+**Rust kernels**, shipped as the `vpt._native` extension built by maturin
+(8.6); suite 3.5s -> 1.4s.
 
 **How it was found.** [`fast-anything`](https://github.com/EL4CTEO/fast-anything)
 v0.8.1 (commit `445abd1`, reviewed before use) profiled the golden test
@@ -966,7 +967,8 @@ Identical to the recursive code on 564 cases (Boolean/Byte/Integer/Double
 inputs incl. 3-channel, random/line/full masks, runs > 255). 2.4x faster,
 and it can no longer hit Python's recursion limit on large images.
 
-**Rust port (fast-anything), verified but not shipped.** The kernel takes
+**Rust port: shipped (8.6).** The note below is from the first scan; the
+kernel now lives in `python/src/path.rs`. The kernel takes
 plain data, so fast-anything could port it: `fast-anything port
 vpt.algorithms.mm.binary.path.BPathOpening.path_run_lengths --agent claude`
 produced a PyO3 crate (reviewed: same scan orders and neighbours, zero-
@@ -974,12 +976,11 @@ padded border, no `build.rs`, only `pyo3`) on the first attempt; 508/508
 replayed calls identical (integer results, so the 1e-9 tolerance is moot).
 With it enabled, the golden suite passes and the 564-case comparison still
 matches. Speed: `BPathOpening` 128x128 120ms (recursive) -> 52ms (Python
-kernel) -> 4ms (Rust); `GPathOpening` 64x64 2.75s -> 0.23s. It lives in
-`python/.fast/` (gitignored) and is switched off in committed code: the
-`enable` shim imports the extension from that local path, so shipping it
-would put a hook in every wheel that only works in one checkout. Shipping
-it for real needs a native build (maturin, per-platform wheels) -- an open
-decision. Locally: `fast-anything enable <id>` / `disable <id>`.
+kernel) -> 4ms (Rust); `GPathOpening` 64x64 2.75s -> 0.23s. fast-anything's
+own `enable` shim imports the extension from `python/.fast/` (gitignored),
+so it can't ship; the generated code was adapted into the maturin crate
+instead (bytes in/out, no fast-anything hook). The `.fast/` port is now
+redundant -- leave it disabled.
 
 ### 8.3 `flatzones/angular/AngularQFZ2.py`
 **Share:** ~7%.
@@ -997,6 +998,78 @@ retry-forcing ones), ~9x faster; the running max matched the full rescan on
 3000 random value lists with NaN/+-inf/signed zeros.
 
 ---
+
+### Second scan (2026-11-23, after 8.1-8.3)
+
+Same command, on `main` at `27a68dd`. Unprofiled suite 3.68s, of which
+`test_misc_golden` (path openings) took 1.9s. Ranked by cumulative time
+under cProfile (12.4s profiled), per `execute`:
+
+| Algorithm | Share | Calls | Notes |
+|---|---|---|---|
+| `GPathOpening` / `BPathOpening` / `VeinProfile` | ~45% | 5 / 1,279 / 1 | one chain; 36% is 8.2's kernel |
+| `GAreaOpening` / `BAreaOpening` | ~17% | 8 / 2,051 | 8.4; also `GAreaClosing` (13%), `AreaGranulometry` (11%) |
+| `ComputeSEs` | ~6% | 1 | 8.5 |
+| everything else | <2% each | | |
+
+Rust feasibility rule from the caveat above: only integer/boolean kernels,
+where "exact" is unambiguous. All three qualify. With them in place the
+profile is flat (re-scan, native on): the largest `execute` is `VeinProfile`
+at ~10% of a 4.2s profiled run, made of the Python around the kernels
+(`Maximum`, `Threshold`, image copies); next are `ADilation`/`GDilation`,
+the `RotationInvariantGabor` family and `MFastReconstruction` at ~5% each,
+all float code already vectorized in numpy. None is worth a native port on
+this evidence; re-profile with real-size inputs before adding more.
+
+### 8.4 `mm/binary/attribute/BAreaOpening.py` / `BAreaClosing.py`
+**Share:** ~17% (2,051 calls: `GAreaOpening`/`GAreaClosing` threshold-
+decompose at all 256 levels and run one per level; `AreaGranulometry` runs
+those per area).
+**Why slow:** a flood fill pushing 8 `Point` objects per pixel and reading
+and writing one pixel per method call.
+**Done in Rust** (`python/src/area.rs`, `small_components`): which pixels a
+call clears (opening) or sets (closing) is exactly the union of the
+8-connected components of fewer than `area` pixels, independent of fill
+order, so the kernel labels components with an index stack and returns
+that mask. Read like `getXYBoolean` (first `xdim * ydim` entries, so
+multi-channel inputs behave as before); a non-`int` `area` stays on the
+Python path. 256x256: 89ms -> 2ms; `GAreaOpening` 64x64: 1.19s -> 26ms.
+
+### 8.5 `mm/gray/adaptive/ComputeSEs.py`
+**Share:** ~6% (one call; O(pixels x SE area)).
+**Done in Rust** (`python/src/amoeba.rs`, `amoeba_masks`): a step-for-step
+transcription of `_computeAmoeba` -- same LIFO stack and neighbour order,
+`tmpImg`'s mod-256 byte storage, and numpy's negative-index wrap for the
+`FlatSE` write -- since with `size // 2 >= 256` the wraparound makes the
+visiting order observable. The cost `int(tmp + 1 + 0.25*abs(p - q))` is
+exact in doubles for 32-bit `getXYByte` values, so the kernel's integer
+`tmp + 1 + |p - q| / 4` is the same number. `FlatSE`s are still built in
+Python (`FlatSE.square` + `fill(False)`, then the mask), which now
+dominates: 64x64 at size 5, 32ms -> 9ms.
+
+### 8.6 How the native kernels ship (maturin)
+- `python/Cargo.toml` + `python/src/*.rs` build the `vpt._native`
+  extension (PyO3, abi3 for CPython >= 3.11, so one wheel per platform).
+  The build backend is maturin instead of hatchling; the version still
+  lives only in `pyproject.toml` (release-please is unchanged).
+- `vpt/_accel.py` imports it; each algorithm uses its kernel when
+  `_accel.native` is set and runs the unchanged Python otherwise. The
+  Python stays the reference. `VPT_PURE_PYTHON=1` switches the extension
+  off; `VPT_REQUIRE_NATIVE=1` makes a failed import an error (CI).
+- `tests/test_native_parity.py` runs each algorithm with the kernel on and
+  off and compares raw storage on all image types, multi-channel inputs,
+  degenerate sizes, runs > 255, out-of-range `area`, and the `ComputeSEs`
+  wraparound/negative-index cases. Mutating any kernel (comparison
+  operator, a neighbour, the byte wrap, the floor in the cost, the index
+  wrap) fails it.
+- CI: `python-ci` lints the Rust (`cargo fmt`, `clippy -D warnings`), runs
+  the goldens natively on 3.11-3.14 plus once pure-Python, then
+  `python-wheels.yml` builds wheels (manylinux x86_64/aarch64, macOS
+  arm64/x86_64, Windows x64) and the sdist and re-runs the suite against
+  each installed artifact. `release-please.yml` calls the same workflow
+  and attaches its output, so releases ship what CI tested.
+- Platforms without a wheel install from the sdist, which needs a Rust
+  toolchain. There is no pure-Python wheel any more.
 
 ## Areas audited with no findings (don't re-audit from scratch)
 
