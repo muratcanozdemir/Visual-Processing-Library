@@ -895,6 +895,109 @@ and the attribute-predicate files lowest (real but marginal value).
 
 ---
 
+## 8. Profiler-driven hotspot scan (2026-11-23, fast-anything)
+
+**Status:** `[x]` all three implemented in pure Python, each bit-identical
+to the code it replaced (2026-11-23); full suite 9.7s -> 3.7s. A verified
+Rust port of 8.2's kernel exists locally but is **not shipped** -- see
+8.2.
+
+**How it was found.** [`fast-anything`](https://github.com/EL4CTEO/fast-anything)
+v0.8.1 (commit `445abd1`, reviewed before use) profiled the golden test
+suite, which exercises every ported algorithm on the Java-verified inputs:
+
+```sh
+cd python
+fast-anything scan -- .venv/bin/python -m pytest -q -p no:cacheprovider
+```
+
+Its state lands in `python/.fast/` (gitignored). Its shares are inclusive
+(a caller's share counts its callees) and measured under a profiler, so
+they add up to more than 100% and overstate pure-Python overhead.
+Unprofiled, `pytest --durations` puts `test_shape_golden.py` at 5.9s of a
+9.5s suite. The scan also ranked three test functions
+(`test_shape_…`/`test_misc_…`/`test_flatzones_…`); those aren't targets,
+since their time is spent inside the library functions below.
+
+**Caveat on fast-anything itself.** It ports functions to Rust and checks
+the port by replaying recorded calls, accepting floats within a *relative
+tolerance of 1e-9* (`src/python.rs`). This port's rule is bit-exact parity
+with the Java oracle, so a fast-anything port is only acceptable where that
+tolerance can't hide anything (integer/boolean code), and must still pass
+the golden suite. Native code would also turn the single pure-Python wheel
+into per-platform wheels. A port should therefore be an optional fast path,
+with the Python code kept as the reference.
+
+### 8.1 `frequential/FFT.py` (+ `util/ComplexNumber.cDiv`, 4.8M calls)
+**Share:** ~57% of profiled suite time (39 calls; `shape.FPFT` and ~15
+texture algorithms call it).
+**Why slow:** recursive radix-2 FFT over millions of `ComplexNumber`
+objects.
+**Key fact:** the module docstring already documents it as
+*non-functional*: `ComplexNumber.cSum`/`cDiff` (preserved Java defect)
+return a fresh zero, so every butterfly is `0+0i` and the output is all
+zeros for any input. Every caller asks for `outputType=MAG` (2), whose
+values are then exactly `+0.0` everywhere (magnitude of a signed zero is
+`+0.0`; `shiftOrigin` of zeros is zeros).
+**Done — pure Python, not Rust:** `MAG` output now short-circuits to the
+zero-filled `DoubleImage(input, False)` (then `shiftOrigin` if `shifted`,
+as before), keeping the full transcription for `REAL`/`REAL_IMAG`/
+`MAG_PHASE`, where the signed zeros the butterflies produce
+(`0 * negative twiddle = -0.0`) are observable. **Correction to the
+original finding:** when the padded transform size is 1 (a 1x1 image) the
+recursion's base case returns the pixel itself, so the output is *not*
+zero there; the shortcut requires a padded size >= 2. Verified bit-for-bit
+against the full transcription on 624 outputs (all four image types,
+1x1/1x2/2x1/odd/multi-channel sizes, NaN/+-inf/-0.0 pixels, both `shifted`
+values, all four output types). Porting it to Rust would have spent effort
+re-implementing a bug.
+
+### 8.2 `mm/binary/path/BPathOpening.py`
+**Share:** ~17% (1,279 calls: `mm/gray/path/GPathOpening` calls it once per
+gray level, and `plants/VeinProfile` (~15%) is `GPathOpening` underneath).
+**Why slow:** memoized per-pixel recursion in four directions.
+**Done in Python:** the 8 memoized recursive helpers compute a longest path
+over a DAG, a pure function of the foreground mask, so they're replaced by
+one module-level kernel, `path_run_lengths(mask, xdim, ydim)`, that
+evaluates the same recurrence iteratively in a dependency-respecting scan
+order per direction. Everything around it (mask read like `getXYBoolean`,
+`ByteImage` storage wrapping mod 256, `Maximum`, `Threshold`) is unchanged.
+Identical to the recursive code on 564 cases (Boolean/Byte/Integer/Double
+inputs incl. 3-channel, random/line/full masks, runs > 255). 2.4x faster,
+and it can no longer hit Python's recursion limit on large images.
+
+**Rust port (fast-anything), verified but not shipped.** The kernel takes
+plain data, so fast-anything could port it: `fast-anything port
+vpt.algorithms.mm.binary.path.BPathOpening.path_run_lengths --agent claude`
+produced a PyO3 crate (reviewed: same scan orders and neighbours, zero-
+padded border, no `build.rs`, only `pyo3`) on the first attempt; 508/508
+replayed calls identical (integer results, so the 1e-9 tolerance is moot).
+With it enabled, the golden suite passes and the 564-case comparison still
+matches. Speed: `BPathOpening` 128x128 120ms (recursive) -> 52ms (Python
+kernel) -> 4ms (Rust); `GPathOpening` 64x64 2.75s -> 0.23s. It lives in
+`python/.fast/` (gitignored) and is switched off in committed code: the
+`enable` shim imports the extension from that local path, so shipping it
+would put a hook in every wheel that only works in one checkout. Shipping
+it for real needs a native build (maturin, per-platform wheels) -- an open
+decision. Locally: `fast-anything enable <id>` / `disable <id>`.
+
+### 8.3 `flatzones/angular/AngularQFZ2.py`
+**Share:** ~7%.
+**Why slow:** `_createQCC` recomputes the maximum `Tools.hueDistance` over
+*every pair* in the growing zone each time it adds a pixel -- O(n^2) per
+step, so O(n^3) per zone.
+**Done — pure Python, exact:** a running `maxDist`; each added pixel is
+compared only against the points already in the zone. The zone list only
+grows within one `_createQCC` call (the caller clears it before every call
+and retry) and `max` involves no rounding, so the result is identical:
+O(n) per step. `hueDistance` is `abs`/compare/`1.0 - a`, symmetric, and a
+NaN distance is skipped by the `>` comparison either way. Identical labels
+on 80 cases (random/banded/wraparound/flat hue fields, alpha/omega incl.
+retry-forcing ones), ~9x faster; the running max matched the full rescan on
+3000 random value lists with NaN/+-inf/signed zeros.
+
+---
+
 ## Areas audited with no findings (don't re-audit from scratch)
 
 - Overload-splitting (`fill*`/`newInstance*` across `Image`, `ByteImage`,

@@ -97,6 +97,24 @@ class AngularQFZ2(Algorithm):
         print(f"Total number of quasi flat zones: {self._label - 1}", file=sys.stderr)
 
     def _createQCC(self, r: Point, alpha2: float) -> int:
+        # The Java recomputes the max hue distance over *every pair* in
+        # `list` each time it adds a pixel (O(n^2) per step, O(n^3) per
+        # zone). `list` only grows during this call, so the max over all
+        # pairs after adding a point equals the previous max combined with
+        # the new point's distances to every point in `list` (itself
+        # included, distance 0). `max` involves no rounding, hueDistance is
+        # symmetric (abs(a - b) == abs(b - a) exactly), and the same strict
+        # `>` skips NaN distances, so this running max is identical to the
+        # full rescan at every step -- including where `> omega` bails out.
+        # `values` caches each listed point's pixel value, read once.
+        values = [self.input.getXYDouble(c.x, c.y) for c in self._list]
+        maxDist = 0.0
+        for a in values:
+            for b in values:
+                tmpDist = Tools.hueDistance(a, b)
+                if tmpDist > maxDist:
+                    maxDist = tmpDist
+
         self._stack.clear()
         self._stack.append(r)
         self._temp.setXYBoolean(r.x, r.y, True)
@@ -111,15 +129,12 @@ class AngularQFZ2(Algorithm):
             p = self.input.getXYDouble(x, y)
 
             self._list.append(tmp)
+            values.append(p)
 
-            maxDist = 0.0
-            for c in self._list:
-                for d in self._list:
-                    tmpDist = Tools.hueDistance(
-                        self.input.getXYDouble(c.x, c.y), self.input.getXYDouble(d.x, d.y)
-                    )
-                    if tmpDist > maxDist:
-                        maxDist = tmpDist
+            for v in values:
+                tmpDist = Tools.hueDistance(v, p)
+                if tmpDist > maxDist:
+                    maxDist = tmpDist
 
             if maxDist > self.omega:
                 for t in self._list2:
