@@ -40,10 +40,6 @@ fallback: set `VPT_PURE_PYTHON=1` to run without the extension (math then
 matches the goldens on Linux/glibc only), or `VPT_REQUIRE_NATIVE=1` to fail
 if it can't be loaded. See `IMPROVEMENTS.md` sections 8 and 9.
 
-Building from source compiles a few C files (CORE-MATH) besides the Rust:
-gcc or clang on Linux/macOS, `clang-cl` (LLVM) on Windows, since MSVC's
-`cl` can't compile them.
-
 ## Releasing
 
 Versions are managed by [release-please](https://github.com/googleapis/release-please)
@@ -270,8 +266,8 @@ goldens that passed on Linux failed on macOS and Windows. The JDK 21
 oracle computes `asin`/`acos`/`atan`/`atan2` with fdlibm (`StrictMath`)
 and `sin`/`cos`/`tan`/`exp`/`log`/`log10`/`pow` with HotSpot's x86_64
 intrinsics. `vpt._native` (`src/jmath.rs`) reproduces the fdlibm ones bit
-for bit and computes the others correctly rounded (vendored CORE-MATH,
-`csrc/core-math`), which is what the intrinsics return except in
+for bit and computes the others correctly rounded (CORE-MATH, translated
+to Rust in `src/cm`), which is what the intrinsics return except in
 hard-to-round cases: about 0.05-0.25% of random `sin`/`cos`/`tan`/`exp`/
 `pow` inputs, where the exact value sits within ~1% of an ulp of a
 rounding midpoint and the intrinsic picks the wrong side. With the

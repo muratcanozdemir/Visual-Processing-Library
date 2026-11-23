@@ -18,6 +18,7 @@ use pyo3::types::PyBytes;
 
 mod amoeba;
 mod area;
+mod cm;
 mod jmath;
 mod path;
 

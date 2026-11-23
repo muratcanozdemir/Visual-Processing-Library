@@ -1104,15 +1104,13 @@ every `j*` helper in `_javacompat` computes through it:
   where `|y/x| > 2^60` and `x < 0` (musl returns `+-pi/2`, fdlibm
   `pi - (z - pi_lo)`): 83,331 of 900,000 stress inputs, and exactly
   `Sobel.THETA`'s documented divergence. The transcription: 0 in 1.1M.
-- `sin`/`cos`/`tan`/`exp`/`log`/`log10`/`pow`: CORE-MATH, vendored
-  (`python/csrc/core-math`, MIT) and compiled by `build.rs` with
-  `-ffp-contract=off` and no `-march=native`; same mismatch counts as the
-  upstream build. The residual mismatches are all Intel misroundings:
-  the 11 in `tests/goldens/jmath.txt` were checked at 200-bit precision.
-  Matching those too would mean porting HotSpot's intrinsic code
-  (`src/hotspot/cpu/x86/macroAssembler_x86_*.cpp`, Intel's, distributed
-  under the GPLv2 with the rest of HotSpot) into this MIT package -- a
-  licensing decision, not an engineering one, so not done.
+- `sin`/`cos`/`tan`/`exp`/`log`/`log10`/`pow`: CORE-MATH, translated
+  to safe Rust (`python/src/cm`, see 9.1). The residual mismatches are
+  all Intel misroundings: the 11 in `tests/goldens/jmath.txt` were checked
+  at 200-bit precision. Matching those too would mean porting HotSpot's
+  intrinsic code (`src/hotspot/cpu/x86/macroAssembler_x86_*.cpp`, Intel's,
+  distributed under the GPLv2 with the rest of HotSpot) into this MIT
+  package -- a licensing decision, not an engineering one, so not done.
 - Every direct platform-math call outside `_javacompat` (114 sites in 30
   files: `math.sin`, `np.exp`, float `**`, ...) now goes through a `j*`
   helper; `tests/test_no_platform_math.py` fails on any new one. Along
@@ -1128,6 +1126,53 @@ Only `shape.ZernikeMoments` keeps one (<= 8 ulp): 9 of its 8,362 distinct
 `sin`/`cos`/`pow` arguments are intrinsic misroundings (replayed through
 the JVM). The pure-Python fallback keeps the old tolerances
 (`tests/_platform.py`).
+
+### 9.1 CORE-MATH in Rust instead of vendored C (2026-11-24)
+
+The first version vendored seven CORE-MATH C files (820 KB) and compiled
+them with `cc` (`-ffp-contract=off`, no `-march=native`, `clang-cl` on
+Windows). Replaced by Rust translations, so the extension is pure Rust:
+
+| Module | From | Rust lines (incl. tables) |
+|---|---|---|
+| `src/cm/trig` | sin.c, cos.c, tan.c (shared code merged) | ~3,860 |
+| `src/cm/explog` | exp.c, log.c, log10.c, dint.h | ~3,230 |
+| `src/cm/pow` | pow.c, pow.h, dint.h, qint.h | ~12,750 |
+
+Each file carries CORE-MATH's copyright and MIT notice (also in
+`THIRD_PARTY_NOTICES`). Translation rules: no `unsafe`, no dependencies;
+tables converted by script and re-checked against the C bit for bit;
+round-to-nearest only (the directed-rounding branches, errno and FP-flag
+code dropped -- callers never change the rounding mode); every C `fma`
+is `f64::mul_add` (the C has no non-FMA alternatives in these files).
+
+**Verification against the C** (compiled unmodified at `-O2
+-ffp-contract=off`, and the `core-math` crate), all bit for bit, NaN
+payloads included -- 0 mismatches everywhere:
+
+| | random inputs / fn | accurate phases forced on / fn | special grid |
+|---|---|---|---|
+| sin, cos, tan | 1,000,000,000 | 200,000,000 | 257,536 |
+| exp, log, log10 | 250,000,000 | 100,000,000 | 8,488 |
+| pow | 1,200,000,006 | 100,000,000 (phase 1 off) + 100,000,000 (phases 1-2 off) | 50x50 grid + 1,334,328 pairs |
+
+"Forced on": a copy of the C and the Rust with the fast path's
+acceptance test made to fail, so every input goes through the accurate
+evaluation that random inputs rarely reach (0.01-18% depending on
+function and input mix; pow's 256-bit phase 0.11%). Debug builds with
+overflow checks found no wrap or out-of-range shift. Against the Java
+dump, the Rust gives the same mismatch counts as the C (sin 289, cos 237,
+tan 456, exp 473, pow 99, log/log10 0 of 200,000 each).
+
+The C is gone, so that comparison can't be re-run from this tree.
+`tests/goldens/crmath.txt` (14,000 rows frozen from the C, weighted
+towards accurate-phase inputs) keeps checking the translation on every
+wheel platform, and `test_fma_is_fused` checks that `f64::mul_add` really
+is fused there (without hardware FMA it calls the platform's `fma()`).
+
+Speed: same as the C at the same flags. On the baseline x86-64 target the
+`mul_add`s become libm `fma()` calls (sin ~45 ns, pow ~68 ns); with FMA
+enabled (`-C target-cpu=native`) ~2-4x faster, same results.
 
 ## Areas audited with no findings (don't re-audit from scratch)
 

@@ -10,8 +10,8 @@ Sources:
   dependencies, excluding proc-macro crates (those run at build time and
   aren't part of the binary). Each crate's license files are copied
   verbatim from the cargo registry (Cargo.lock pins the versions).
-- Code adapted into src/ from other projects (NOTICES below): the
-  CORE-MATH functions and fdlibm's atan2.
+- Code translated into src/ from other projects (NOTICES below): the
+  CORE-MATH functions (src/cm) and fdlibm's atan2 (src/jmath.rs).
 
 Run from python/ (the crate root).
 """
@@ -30,7 +30,8 @@ CORE_MATH_LICENSE = (ROOT / "notices" / "core-math-LICENSE").read_text()
 
 NOTICES = [
     (
-        "CORE-MATH (correctly rounded sin, cos, tan, exp, log, log10, pow)",
+        "CORE-MATH (correctly rounded sin, cos, tan, exp, log, log10, pow;"
+        " translated to Rust in src/cm, original C files named below)",
         "https://core-math.gitlabpages.inria.fr/",
         "sin.c, cos.c, tan.c: Copyright (c) 2022-2025 Paul Zimmermann and Tom Hubrecht\n"
         "exp.c: Copyright (c) 2022-2025 Alexei Sibidanov.\n"

@@ -11,7 +11,7 @@
 //!   intrinsics (Intel's libm), which are not fdlibm and not public
 //!   outside HotSpot. They are within a fraction of an ulp of the exact
 //!   result, so the closest portable match is the correctly rounded
-//!   result, which CORE-MATH computes (vendored in csrc/core-math). It
+//!   result, which CORE-MATH computes (translated to Rust in `src/cm`). It
 //!   agrees with Java on every `log`/`log10` input tested and on 99.76% to
 //!   99.95% of `sin`/`cos`/`tan`/`exp`/`pow` inputs; the remaining cases
 //!   are where Intel's code misrounds. Unlike the platform libm, the
@@ -28,38 +28,26 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
-unsafe extern "C" {
-    fn cr_sin(x: f64) -> f64;
-    fn cr_cos(x: f64) -> f64;
-    fn cr_tan(x: f64) -> f64;
-    fn cr_exp(x: f64) -> f64;
-    fn cr_log(x: f64) -> f64;
-    fn cr_log10(x: f64) -> f64;
-    fn cr_pow(x: f64, y: f64) -> f64;
-}
-
-// The CORE-MATH functions are pure (they read the rounding mode and may
-// set floating-point flags/errno, nothing else), hence the safe wrappers.
 pub fn sin(x: f64) -> f64 {
-    unsafe { cr_sin(x) }
+    crate::cm::trig::sin(x)
 }
 pub fn cos(x: f64) -> f64 {
-    unsafe { cr_cos(x) }
+    crate::cm::trig::cos(x)
 }
 pub fn tan(x: f64) -> f64 {
-    unsafe { cr_tan(x) }
+    crate::cm::trig::tan(x)
 }
 pub fn exp(x: f64) -> f64 {
-    unsafe { cr_exp(x) }
+    crate::cm::explog::exp(x)
 }
 pub fn log(x: f64) -> f64 {
-    unsafe { cr_log(x) }
+    crate::cm::explog::log(x)
 }
 pub fn log10(x: f64) -> f64 {
-    unsafe { cr_log10(x) }
+    crate::cm::explog::log10(x)
 }
 pub fn pow(x: f64, y: f64) -> f64 {
-    unsafe { cr_pow(x, y) }
+    crate::cm::pow::pow(x, y)
 }
 pub fn asin(x: f64) -> f64 {
     libm::asin(x)
@@ -206,6 +194,7 @@ macro_rules! unary {
             m.add_function(wrap_pyfunction!(py::pow_arr, m)?)?;
             m.add_function(wrap_pyfunction!(py::atan2, m)?)?;
             m.add_function(wrap_pyfunction!(py::atan2_arr, m)?)?;
+            m.add_function(wrap_pyfunction!(py::fma, m)?)?;
             Ok(())
         }
     };
@@ -227,6 +216,13 @@ mod py {
         acos / acos_arr,
         atan / atan_arr,
     );
+
+    /// `x * y + z` with one rounding (`f64::mul_add`), exposed so the test
+    /// suite can check it really is fused on each platform.
+    #[pyfunction]
+    pub fn fma(x: f64, y: f64, z: f64) -> f64 {
+        x.mul_add(y, z)
+    }
 
     #[pyfunction]
     pub fn pow(x: f64, y: f64) -> f64 {
