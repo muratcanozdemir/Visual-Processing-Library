@@ -22,7 +22,9 @@ from __future__ import annotations
 import math
 import traceback
 
-from ..._javacompat import idiv, int32, jatan2, jdiv
+import numpy as np
+
+from ..._javacompat import idiv, int32, jatan2_arr, jcos_arr, jdiv, jpow_arr, jsin_arr
 from ...Algorithm import Algorithm
 from ...GlobalException import GlobalException
 from ...Image import Image
@@ -64,70 +66,81 @@ class ZernikeMoment(Algorithm):
         radius = float(idiv(self.ydim, 2))
         j_scale = math.sqrt(2.0) * radius
 
-        res = ComplexNumber()
-        lambdaN = 0.0
-        for _y in range(self.ydim):
-            for _x in range(self.xdim):
-                x = (_x - i_0) / i_scale
-                y = (_y - j_0) / j_scale
+        # Vectorized, bit-identical to the Java per-pixel loop:
+        # - the per-s radial coefficients don't depend on the pixel, so they
+        #   are computed once, with the same int32-wrapping scalar code;
+        # - pow/atan2/cos/sin go through the libm-backed *_arr helpers, which
+        #   give each pixel exactly the scalar math.* result (np.power and the
+        #   other ufuncs would not -- see _javacompat._libm_map);
+        # - the pixel sums use np.cumsum, which adds strictly left to right in
+        #   the loop's y-outer/x-inner order (np.sum's pairwise summation
+        #   would round differently). A leading 0.0 reproduces the loop's
+        #   `0.0 + first` (which turns a lone -0.0 into 0.0).
+        _y, _x = np.mgrid[0 : self.ydim, 0 : self.xdim]
+        # A 1-pixel-wide or -tall image makes i_scale/j_scale 0.0: Java's
+        # double division gives NaN/Infinity there (no pixel is inside the
+        # disc, so the moment comes out NaN), which numpy matches -- only
+        # its warnings need silencing. (The old scalar port raised
+        # ZeroDivisionError instead.)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            x = (_x - i_0) / i_scale
+            y = (_y - j_0) / j_scale
+            r2 = x * x + y * y
+            inside = r2 <= 1.0
+        x, y, r2 = x[inside], y[inside], r2[inside]
+        p = self.input.getDoubleArray().reshape(self.ydim, self.xdim)[inside]
 
-                p = self.input.getXYDouble(_x, _y)
-                if x * x + y * y <= 1.0:
-                    v = self._zer_pol(self.n, self.m, x, y)
-                    res.real += p * v.real
-                    res.imag += p * v.imag
-                    lambdaN += p
+        r = np.zeros_like(r2)
+        for coef, exponent in self._zer_pol_R_terms(self.n, self.m):
+            r = r + coef * jpow_arr(r2, exponent)
+        arg = self.m * jatan2_arr(y, x)
+        v_real = r * jcos_arr(arg)
+        v_imag = r * jsin_arr(arg)
+
+        res = ComplexNumber()
+        res.real = _sequential_sum(p * v_real)
+        res.imag = _sequential_sum(p * v_imag)
+        lambdaN = _sequential_sum(p)
 
         res.real = jdiv(res.real * (self.n + 1), lambdaN)
         res.imag = jdiv(res.imag * (self.n + 1), lambdaN)
 
         self.moment = res.magnitude()
 
-    def _zer_pol(self, n: int, m: int, x: float, y: float) -> ComplexNumber:
-        if x * x + y * y > 1.0:
-            return ComplexNumber(0.0, 0.0)
-
-        r = self._zer_pol_R(n, m, x, y)
-
-        arg = m * jatan2(y, x)
-        real = r * math.cos(arg)
-        imag = r * math.sin(arg)
-
-        return ComplexNumber(real, imag)
-
-    def _zer_pol_R(self, n: int, m_in: int, x: float, y: float) -> float:
+    @staticmethod
+    def _zer_pol_R_terms(n: int, m_in: int) -> list[tuple[float, float]]:
+        """The Java ``zer_pol_R``'s terms as ``(coefficient, exponent)``
+        pairs: ``R(r2) = sum(coef * r2 ** exponent)``, summed in this order.
+        ``coef`` is ``sign * (a * 1.0 / (b * c * d))`` with the Java ``int``
+        wraparound preserved -- the same value the per-pixel loop computed,
+        evaluated left to right the same way."""
         m = abs(m_in)
         if (n - m) % 2 != 0:
             raise ValueError("zer_pol_R: n - |m| is odd")
-        res = 0.0
-        if x * x + y * y <= 1.0:
-            sign = 1
-            a = 1
-            for i in range(2, n + 1):
-                a = int32(a * i)
+        terms = []
+        sign = 1
+        a = 1
+        for i in range(2, n + 1):
+            a = int32(a * i)
 
-            b = 1
-            c = 1
-            for i in range(2, idiv(n + m, 2) + 1):
-                c = int32(c * i)
+        b = 1
+        c = 1
+        for i in range(2, idiv(n + m, 2) + 1):
+            c = int32(c * i)
 
-            d = 1
-            for i in range(2, idiv(n - m, 2) + 1):
-                d = int32(d * i)
+        d = 1
+        for i in range(2, idiv(n - m, 2) + 1):
+            d = int32(d * i)
 
-            for s in range(idiv(n - m, 2) + 1):
-                res += (
-                    sign
-                    * jdiv(a * 1.0, int32(int32(b * c) * d))
-                    * (x * x + y * y) ** (n / 2.0 - s)
-                )
-                if s < idiv(n - m, 2):
-                    sign *= -1
-                    a = int32(idiv(a, n - s))
-                    b = int32(b * (s + 1))
-                    c = int32(idiv(c, idiv(n + m, 2) - s))
-                    d = int32(idiv(d, idiv(n - m, 2) - s))
-        return res
+        for s in range(idiv(n - m, 2) + 1):
+            terms.append((sign * jdiv(a * 1.0, int32(int32(b * c) * d)), n / 2.0 - s))
+            if s < idiv(n - m, 2):
+                sign *= -1
+                a = int32(idiv(a, n - s))
+                b = int32(b * (s + 1))
+                c = int32(idiv(c, idiv(n + m, 2) - s))
+                d = int32(idiv(d, idiv(n - m, 2) - s))
+        return terms
 
     @staticmethod
     def invoke(input: Image, n: int, m: int) -> float | None:
@@ -136,3 +149,8 @@ class ZernikeMoment(Algorithm):
         except GlobalException:
             traceback.print_exc()
         return None
+
+
+def _sequential_sum(a: np.ndarray) -> float:
+    """``total = 0.0; for v in a: total += v`` -- same rounding, in C."""
+    return float(np.cumsum(np.concatenate(([0.0], a)))[-1])

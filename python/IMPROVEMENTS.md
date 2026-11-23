@@ -584,8 +584,8 @@ zero subtlety, applies identically everywhere.
 
 ### 7.9 `statistical/*.py`
 **Status:** `[x]` for `Mean`/`Variance`/`SDev`/`Skewness`/`Kurtosis`/
-`Moment`/`CentralMoment`/`ContrastRatio`; `[ ]` **deliberately deferred**
-for `ZernikeMoment.py`. `Moment`'s shared computation was factored into
+`Moment`/`CentralMoment`/`ContrastRatio`; `[x]` for `ZernikeMoment.py`
+too (2026-11-23, see the update at the end of this item). `Moment`'s shared computation was factored into
 `_momentAllChannels`, with `CentralMoment` calling it directly since its
 `centroidX`/`centroidY` are provably always `0.0` (documented dead-code
 bug), making its loop computationally identical to `Moment`'s, not just
@@ -598,6 +598,17 @@ from CPython's scalar `**` (which the reference loop uses via
 `(x*x+y*y)**(n/2.0-s)`) on ~0.1% of inputs — these exact exponents are
 common in this formula. Left unmodified rather than risk a silent
 divergence; still tracked as not-done. Full suite passes.
+**Update 2026-11-23 — done.** The `**` landmine no longer applies: the
+radial power now goes through `jpow_arr`, which calls `math.pow` per element
+(never `np.power`), and atan2/cos/sin through the libm-backed `*_arr`
+helpers (`_javacompat._libm_map`). The per-`s` coefficients are pixel-
+independent and computed once with the original int32-wrapping code; the
+pixel sums use `np.cumsum` with a leading `0.0` to keep the loop's strict
+left-to-right rounding. Verified bit-identical to the previous scalar loop
+on 1862 cases (byte/double/signed-zero images, odd and even sizes, every
+valid `(n, m)` up to 14 plus `n` up to 40 for int32 overflow), ~6x faster
+at 128x128. One deliberate behaviour change: a 1-pixel-wide/tall image
+used to raise `ZeroDivisionError`; it now returns NaN, as Java does.
 - `Mean.py` — `np.cumsum(getDoubleArray())[-1] / size`, same order-preserving
   trick as `Equalization.py`/`SaliencyMap.py`. Called from many other
   algorithms (shape descriptors, `Normalize`, `PCA`) — real hot path.
@@ -758,9 +769,18 @@ median-vs-min selection — structurally identical to `GRankFilter.py`
 **Priority:** High — direct reuse of an already-proven pattern, near-free.
 
 ### 7.17 `features/QFZBasedStableRegions.py`
-**Status:** `[ ]` — **deliberately deferred**, not implemented in this
-round (real structural refactor, lowest ROI of the round-3 findings — see
-priority note below).
+**Status:** `[x]` (2026-11-23). The per-pixel scale scan is vectorized: a
+`(scale, x, y)` component-area array, a run-length scan per scale pair with
+a vectorized Java-int-division `relativeAreaDiff`, `argmax` (first
+maximum, matching the strict-`>` scan), and the painting loop visits each
+kept zone object once in the original x-outer/y-inner order, preserving the
+skip-if-first-point-painted quirk. Verified identical output to the
+previous loop on 20 images (checker/ramp/noise/blobs/flat, 17x53 to 64x64,
+outputs ranging from all-False through partial to all-True). Honest
+payoff: small. Profiling a 64x64 image showed the 15 upstream
+`GrayQFZSoille` calls take ~70% of the runtime and this loop ~15%, so the
+end-to-end gain is ~10%. `GrayQFZSoille` is the real hot path if this
+algorithm ever needs to be faster.
 Data-dependent variable-length per-pixel scan over irregular connected-
 component-list structures (`zones[s][x][y]` is a shared Python list per
 component, size varies per pixel/scale). Real structural work: would first
@@ -783,7 +803,14 @@ for the `mm/gray/connected/attribute/*.py` (14 files) and
 `mm/multi/connected/attribute/*.py` (6 files) predicate families — lowest
 priority of this section's findings, real per-call NumPy overhead vs.
 typically-small max-tree node regions, only worth it if profiling shows
-attribute-opening/closing as a hot path. `GLambdaLeveling`'s two threshold
+attribute-opening/closing as a hot path. **Profiled 2026-11-23, closed as
+not worth doing:** on a 96x96 structured image, time inside attribute
+`test()` was 0% of `GMaxTreeIncrAttrOpening` + `Area`, 2% of
+`GMaxTreeNonIncrAttrOpening` + `Sdev`, and 11% with `Entropy`. Vectorizing
+would still need a Python pass over each node's point list to gather
+coordinates, so the most it could save is a fraction of those
+percentages. The max-tree construction/filtering around them is where the
+time goes. `GLambdaLeveling`'s two threshold
 branches (`i > m+lambda`, `m > i+lambda`) are mathematically mutually
 exclusive for `lambda >= 0`, so the scalar `if`/`elif` and unordered
 `np.where` selection are provably equivalent. `DistanceTransform`'s outer
