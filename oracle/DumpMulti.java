@@ -139,5 +139,15 @@ public class DumpMulti {
 
         MultiGeometricVolume geo = new MultiGeometricVolume(Integer.valueOf(1));
         dumpGray("MMaxTreeIncrAttrOpening(rgb,MultiGeometricVolume(1),lex)", MMaxTreeIncrAttrOpening.invoke(rgb, geo, lex));
+
+        // mm.multi.connected.attribute.MultiSdev/MultiSdev2 (the vectorial
+        // ones; unrelated to mm.gray.connected.attribute's classes of the
+        // same names) -- same MMaxTreeIncrAttrOpening route as above.
+        for (int t : new int[] {1, 20}) {
+            dumpGray("MMaxTreeIncrAttrOpening(rgb,MultiSdev(" + t + "),lex)",
+                MMaxTreeIncrAttrOpening.invoke(rgb, new MultiSdev(Integer.valueOf(t)), lex));
+            dumpGray("MMaxTreeIncrAttrOpening(rgb,MultiSdev2(" + t + "),lex)",
+                MMaxTreeIncrAttrOpening.invoke(rgb, new MultiSdev2(Integer.valueOf(t)), lex));
+        }
     }
 }

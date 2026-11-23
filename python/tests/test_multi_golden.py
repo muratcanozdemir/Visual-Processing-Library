@@ -39,6 +39,8 @@ from vpt.algorithms.mm.multi.connected.attribute import (
     MultiArea,
     MultiDiagonal,
     MultiGeometricVolume,
+    MultiSdev,
+    MultiSdev2,
     MultiSpectralVolume,
 )
 from vpt.algorithms.mm.multi.geo import (
@@ -287,6 +289,18 @@ def test_multi_matches_java_oracle():
         "MMaxTreeIncrAttrOpening(rgb,MultiGeometricVolume(1),lex)",
         MMaxTreeIncrAttrOpening.invoke(rgb, geo, lex),
     )
+
+    # The vectorial MultiSdev/MultiSdev2 (unrelated to mm.gray's classes of
+    # the same names), through the same MMaxTreeIncrAttrOpening route.
+    for t in (1, 20):
+        check_gray(
+            f"MMaxTreeIncrAttrOpening(rgb,MultiSdev({t}),lex)",
+            MMaxTreeIncrAttrOpening.invoke(rgb, MultiSdev(t), lex),
+        )
+        check_gray(
+            f"MMaxTreeIncrAttrOpening(rgb,MultiSdev2({t}),lex)",
+            MMaxTreeIncrAttrOpening.invoke(rgb, MultiSdev2(t), lex),
+        )
 
     assert not failures, (
         f"{len(failures)} golden checks failed:\n  " + "\n  ".join(failures[:40])
