@@ -10,6 +10,7 @@ import traceback
 
 import numpy as np
 
+from ..._javacompat import jexp_arr
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -52,7 +53,7 @@ class EuclideanDistanceFromRGBColor(Algorithm):
             # array equivalent (both correctly-rounded IEEE-754, verified
             # bit-exact against the golden here rather than assumed).
             with np.errstate(over="ignore"):
-                distance = 1.0 / (1.0 + np.exp(-5.0 * (distance - 0.5)))
+                distance = 1.0 / (1.0 + jexp_arr(-5.0 * (distance - 0.5)))
 
         self.output.setDoubleArray(distance.reshape(-1))
 

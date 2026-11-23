@@ -9,7 +9,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jdiv, jdiv_arr, jint, jint_arr, jround, jround_arr
+from ..._javacompat import jcos_arr, jdiv, jdiv_arr, jint, jint_arr, jround, jround_arr, jsin_arr
 from ...Algorithm import Algorithm
 from ...ByteImage import ByteImage
 from ...GlobalException import GlobalException
@@ -47,10 +47,10 @@ class HSY2RGB(Algorithm):
 
         k = jint_arr(np.floor(H / _PI_OVER_3))
         Hstar = H - k * _PI_OVER_3
-        C = jdiv_arr(math.sqrt(3.0) * S, 2.0 * np.sin(_TWO_PI_OVER_3 - Hstar))
+        C = jdiv_arr(math.sqrt(3.0) * S, 2.0 * jsin_arr(_TWO_PI_OVER_3 - Hstar))
 
-        C1 = C * np.cos(H)
-        C2 = -1.0 * C * np.sin(H)
+        C1 = C * jcos_arr(H)
+        C2 = -1.0 * C * jsin_arr(H)
 
         R = 1.0 * Y + 0.701 * C1 + 0.2730866773266931 * C2
         G = 1.0 * Y - 0.299 * C1 - 0.3042635918629327 * C2

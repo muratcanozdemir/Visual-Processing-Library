@@ -17,7 +17,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jdiv, jint_arr, jround_arr
+from ..._javacompat import jdiv, jexp_arr, jint_arr, jround_arr
 from ...Algorithm import Algorithm
 from ...GlobalException import GlobalException
 from ...Image import Image
@@ -94,7 +94,7 @@ class SaturationWeightedHueHistogram(Algorithm):
 
     @staticmethod
     def _sigma_arr(z: np.ndarray) -> np.ndarray:
-        return 1.0 / (1.0 + np.exp(-5.0 * (z - 0.5)))
+        return 1.0 / (1.0 + jexp_arr(-5.0 * (z - 0.5)))
 
     @staticmethod
     def invoke(hsy: Image) -> list[float] | None:

@@ -27,7 +27,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jint_arr
+from ..._javacompat import jcos_arr, jint_arr, jsin_arr
 from ...Algorithm import Algorithm
 from ...ByteImage import ByteImage
 from ...GlobalException import GlobalException
@@ -71,8 +71,8 @@ class HoughTransformLine(Algorithm):
             phis.append(phi2)
             phi += 0.0174532925199433
         phi2_arr = np.array(phis, dtype=np.float64)
-        cos_arr = np.cos(phi2_arr)
-        sin_arr = np.sin(phi2_arr)
+        cos_arr = jcos_arr(phi2_arr)
+        sin_arr = jsin_arr(phi2_arr)
 
         out_xdim = self.output.getXDim()
         out_ydim = self.output.getYDim()

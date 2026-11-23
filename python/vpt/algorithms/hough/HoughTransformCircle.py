@@ -29,7 +29,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jround_arr
+from ..._javacompat import jcos_arr, jround_arr, jsin_arr
 from ...Algorithm import Algorithm
 from ...ByteImage import ByteImage
 from ...GlobalException import GlobalException
@@ -87,8 +87,8 @@ class HoughTransformCircle(Algorithm):
             xs = X[mask]
             ys = Y[mask]
             phi = theta_pixels[:, :, c][mask]
-            cos_phi = np.cos(phi)
-            sin_phi = np.sin(phi)
+            cos_phi = jcos_arr(phi)
+            sin_phi = jsin_arr(phi)
 
             sub = full[:, :, c]
             for r in range(1, diag):

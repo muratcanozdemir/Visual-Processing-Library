@@ -22,6 +22,7 @@ import traceback
 
 import numpy as np
 
+from ..._javacompat import jpow_arr
 from ...Algorithm import Algorithm
 from ...GlobalException import GlobalException
 from ...Image import Image
@@ -42,7 +43,8 @@ def _momentAllChannels(input: Image, momentX: int, momentY: int) -> list[float]:
 
     x = np.arange(xdim, dtype=np.float64).reshape(-1, 1)
     y = np.arange(ydim, dtype=np.float64).reshape(1, -1)
-    weight = (x + 1) ** momentX * (y + 1) ** momentY  # shape (xdim, ydim)
+    # jpow_arr (per-element math.pow), not numpy `**`: see _javacompat._libm_map.
+    weight = jpow_arr(x + 1, momentX) * jpow_arr(y + 1, momentY)  # shape (xdim, ydim)
 
     # getDoubleArray() is flat [y][x][c] (elementwise equal to
     # getXYCDouble(x, y, c), so no DoubleImage conversion needed); reshape

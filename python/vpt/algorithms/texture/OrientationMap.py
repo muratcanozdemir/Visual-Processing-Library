@@ -27,7 +27,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jatan2, jatan2_arr
+from ..._javacompat import jatan2, jatan2_arr, jcos_arr, jsin_arr
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -140,8 +140,8 @@ class OrientationMap(Algorithm):
         t = theta_arr + math.pi
         with np.errstate(over="ignore", invalid="ignore"):
             m2 = mod_arr * mod_arr
-            contrib1 = m2 * np.sin(t * 2.0)
-            contrib2 = m2 * np.cos(t * 2.0)
+            contrib1 = m2 * jsin_arr(t * 2.0)
+            contrib2 = m2 * jcos_arr(t * 2.0)
 
         tmp1 = np.zeros((self._ydim, self._xdim), dtype=np.float64)
         tmp2 = np.zeros((self._ydim, self._xdim), dtype=np.float64)

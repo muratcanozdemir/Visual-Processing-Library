@@ -21,6 +21,7 @@ import traceback
 
 import numpy as np
 
+from ...._javacompat import jexp_arr
 from ....Algorithm import Algorithm
 from ....ByteImage import ByteImage
 from ....GlobalException import GlobalException
@@ -111,8 +112,8 @@ class MHSYMaxGradient(Algorithm):
                 tmp = tmp * (
                     1.0
                     / (
-                        (1.0 + np.exp(-10.0 * (ns - 0.35)))
-                        * (1.0 + np.exp(-10.0 * (cs - 0.35)))
+                        (1.0 + jexp_arr(-10.0 * (ns - 0.35)))
+                        * (1.0 + jexp_arr(-10.0 * (cs - 0.35)))
                     )
                 )
 

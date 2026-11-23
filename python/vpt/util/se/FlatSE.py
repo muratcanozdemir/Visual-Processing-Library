@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import sys
 
-import numpy as np
-
-from ..._javacompat import Point, idiv, jround
+from ..._javacompat import Point, idiv, jcos, jround, jsin
 from ...BooleanImage import BooleanImage
 from ..Distance import Distance
 
@@ -131,8 +129,8 @@ class FlatSE(BooleanImage):
     # ------------------------------------------------------------------
     @staticmethod
     def _arcPoint(se: "FlatSE", radius: int, i: int, perimeter: int) -> tuple[int, int]:
-        x = se.center.x + int(jround(radius * np.cos(TWO_PI * i / perimeter)))
-        y = se.center.y + int(jround(radius * np.sin(TWO_PI * i / perimeter)))
+        x = se.center.x + int(jround(radius * jcos(TWO_PI * i / perimeter)))
+        y = se.center.y + int(jround(radius * jsin(TWO_PI * i / perimeter)))
         return x, y
 
     @staticmethod

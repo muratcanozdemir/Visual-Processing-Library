@@ -8,7 +8,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import idiv, jint_arr
+from ..._javacompat import idiv, jcos_arr, jint_arr, jsin_arr
 from ...Algorithm import Algorithm
 from ...GlobalException import GlobalException
 from ...Image import Image
@@ -42,8 +42,8 @@ class ToPolar(Algorithm):
         rhoIdx = np.arange(diagonal, dtype=np.float64)
 
         rad = thetaIdx * 3.141592653589793 / 180.0
-        cosT = np.cos(rad)
-        sinT = np.sin(rad)
+        cosT = jcos_arr(rad)
+        sinT = jsin_arr(rad)
 
         x = rhoIdx[:, None] * cosT[None, :] + idiv(xdim, 2)
         y = rhoIdx[:, None] * sinT[None, :] + idiv(ydim, 2)
