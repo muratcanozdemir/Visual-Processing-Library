@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/muratcanozdemir/Visual-Processing-Library/compare/python-v0.1.1...python-v0.1.2) (2026-11-24)
+
+
+### Performance Improvements
+
+* **python:** Rust kernels for path/area openings and ComputeSEs, built with maturin ([#12](https://github.com/muratcanozdemir/Visual-Processing-Library/issues/12)) ([31b91d8](https://github.com/muratcanozdemir/Visual-Processing-Library/commit/31b91d84b9cf060982675cf10d71b2b89da17796))
+
 ## [0.1.1](https://github.com/muratcanozdemir/Visual-Processing-Library/compare/python-v0.1.0...python-v0.1.1) (2026-11-23)
 
 
