@@ -27,8 +27,10 @@ foreground mask, independent of visiting order:
 Java computes it.) ``path_run_lengths`` evaluates exactly that recurrence
 iteratively, scanning each direction in an order that visits every
 neighbour before the pixel needing it. It works on plain data (a flat mask
-in, flat ints out), which also makes it a self-contained target for a native
-port (see ``python/IMPROVEMENTS.md`` section 8.2). The surrounding steps are
+in, flat ints out), which made it a self-contained target for a native
+port: when the ``vpt._native`` extension is available, ``execute`` uses its
+``path_run_lengths`` (``python/src/path.rs``) instead -- see ``vpt._accel``
+and ``python/IMPROVEMENTS.md`` section 8.2. The surrounding steps are
 unchanged: the mask is read exactly like ``getXYBoolean`` (flat index
 ``x + xdim * y``), the run lengths go into ``ByteImage``s (which wrap values
 mod 256, as the Java's do), then ``Maximum`` and ``Threshold``. Unlike the
@@ -42,6 +44,7 @@ import traceback
 
 import numpy as np
 
+from ..... import _accel
 from .....Algorithm import Algorithm
 from .....ByteImage import ByteImage
 from .....GlobalException import GlobalException
@@ -130,9 +133,16 @@ class BPathOpening(Algorithm):
         self.ydim = self.input.getYDim()
         n = self.xdim * self.ydim
 
-        # getXYBoolean(x, y) reads flat index x + xdim * y.
-        mask = [self.input.getBoolean(i) for i in range(n)]
-        lengths = path_run_lengths(mask, self.xdim, self.ydim)
+        # getXYBoolean(x, y) reads flat index x + xdim * y; getBooleanArray
+        # agrees with getBoolean element for element on every image type.
+        mask = self.input.getBooleanArray()[:n]
+        native = _accel.native
+        if native is not None:
+            # Same values from the Rust kernel (python/src/path.rs).
+            raw = native.path_run_lengths(mask.astype(np.uint8).tobytes(), self.xdim, self.ydim)
+            lengths = np.frombuffer(raw, dtype="<u4").astype(np.int64)
+        else:
+            lengths = path_run_lengths(mask.tolist(), self.xdim, self.ydim)
 
         # One ByteImage per direction, shaped like the input (the Java's
         # `new ByteImage(input, false)`), with the run lengths in the first

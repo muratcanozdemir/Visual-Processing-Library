@@ -13,7 +13,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jint_arr, jpow_arr, jround_arr
+from ..._javacompat import jint_arr, jpow, jpow_arr, jround_arr
 from ...Algorithm import Algorithm
 from ...ByteImage import ByteImage
 from ...DoubleImage import DoubleImage
@@ -85,15 +85,15 @@ class XYZ2LAB(Algorithm):
         Yfrac = y / Yn
         Zfrac = z / Zn
         if Xfrac > _THRESHOLD:
-            Xfrac = Xfrac**0.333333
+            Xfrac = jpow(Xfrac, 0.333333)
         else:
             Xfrac = (903.29999999999995 * Xfrac + 16.0) / 116.0
         if Yfrac > _THRESHOLD:
-            Yfrac = Yfrac**0.333333
+            Yfrac = jpow(Yfrac, 0.333333)
         else:
             Yfrac = (903.29999999999995 * Yfrac + 16.0) / 116.0
         if Zfrac > _THRESHOLD:
-            Zfrac = Zfrac**0.333333
+            Zfrac = jpow(Zfrac, 0.333333)
         else:
             Zfrac = (903.29999999999995 * Zfrac + 16.0) / 116.0
 

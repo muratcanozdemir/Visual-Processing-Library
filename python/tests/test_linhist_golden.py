@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from _platform import libm_ulp
 from vpt import ByteImage, Point
 from vpt.algorithms.conversion import RGB2Gray
 from vpt.algorithms.histogram import ContrastStretch, Histogram
@@ -170,7 +171,7 @@ def test_linhist_matches_java_oracle():
         # Contrast-stretching (t=3, normalized=True) is unaffected: verified
         # separately that all 256 pixels agree bit-exactly, since the affine
         # rescale doesn't preserve the 1-ulp gap at these pixel values.
-        max_ulp = 1 if t == Sobel.THETA else 0
+        max_ulp = libm_ulp(1) if t == Sobel.THETA else 0
         check_gray(f"Sobel(g,{t},false)", Sobel.invoke(g, t, False), max_ulp=max_ulp)
         check_gray(f"Sobel(g,{t},true)", Sobel.invoke(g, t, True))
 

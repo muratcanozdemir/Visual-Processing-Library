@@ -15,6 +15,8 @@ import math
 
 import numpy as np
 
+from . import _accel
+
 INT_MIN = -2147483648
 INT_MAX = 2147483647
 LONG_MIN = -(2**63)
@@ -277,6 +279,59 @@ def jdiv_arr(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return out
 
 
+# --------------------------------------------------------------------------
+# Transcendental functions: one implementation on every platform
+# --------------------------------------------------------------------------
+# ``java.lang.Math``'s transcendentals are not the platform C library's, and
+# the platform libraries differ from each other: the same golden test
+# passed on Linux (glibc) and failed by an ulp or two on macOS and Windows.
+# When the ``vpt._native`` extension is available, every ``j*`` function
+# below computes through it instead (``python/src/jmath.rs``): fdlibm for
+# asin/acos/atan/atan2 (bit-identical to Java's StrictMath, which Math
+# delegates to) and correctly rounded CORE-MATH for sin/cos/tan/exp/log/
+# log10/pow (the closest portable match to HotSpot's intrinsics). Same
+# answer on every OS and CPU. Without the extension (``VPT_PURE_PYTHON``,
+# or no build), they fall back to ``math``/libm, which matches the goldens
+# on Linux/glibc only.
+#
+# Chosen once, at import: these are hot scalar paths. ``_accel.native`` is
+# the switch for the kernels; the math backend is the import-time value.
+_NATIVE = _accel.native
+
+
+def _backend(name: str):
+    return getattr(_NATIVE, name) if _NATIVE is not None else getattr(math, name)
+
+
+_sin = _backend("sin")
+_cos = _backend("cos")
+_tan = _backend("tan")
+_asin = _backend("asin")
+_acos = _backend("acos")
+_atan = _backend("atan")
+_atan2 = _backend("atan2")
+_exp = _backend("exp")
+_log = _backend("log")
+_log10 = _backend("log10")
+_pow = _backend("pow")
+
+
+def _jmap(name: str, fn, *arrays: np.ndarray) -> np.ndarray:
+    """Elementwise ``fn`` (a scalar ``j*`` wrapper) over broadcast float64
+    arrays. With the extension, one native call (``<name>_arr``) does the
+    whole array: its C99 special cases are already Java's for every
+    function routed here (``pow`` is not, and has its own path in
+    :func:`jpow_arr`). Without it, :func:`_libm_map`."""
+    if _NATIVE is None:
+        return _libm_map(fn, *arrays)
+    arrs = np.broadcast_arrays(*[np.asarray(a, dtype=np.float64) for a in arrays])
+    shape = arrs[0].shape
+    raw = getattr(_NATIVE, name + "_arr")(
+        *[np.ascontiguousarray(a, dtype="<f8").tobytes() for a in arrs]
+    )
+    return np.frombuffer(raw, dtype="<f8").astype(np.float64).reshape(shape)
+
+
 def _libm_map(fn, *arrays: np.ndarray) -> np.ndarray:
     """Apply scalar ``fn`` (a ``math``-backed Java-semantics wrapper) to
     every element, broadcasting like a ufunc, and return a float64 array.
@@ -317,7 +372,7 @@ def jlog(x: float) -> float:
         return math.nan
     if x == 0.0:
         return -math.inf
-    return math.log(x)
+    return _log(x)
 
 
 def jlog10(x: float) -> float:
@@ -327,13 +382,18 @@ def jlog10(x: float) -> float:
         return math.nan
     if x == 0.0:
         return -math.inf
-    return math.log10(x)
+    return _log10(x)
 
 
 def jlog10_arr(x: np.ndarray) -> np.ndarray:
-    """Elementwise :func:`jlog10`, through libm (see :func:`_libm_map`), not
-    ``np.log10``, whose SIMD kernels are CPU-dependent."""
-    return _libm_map(jlog10, x)
+    """Elementwise :func:`jlog10` (see :func:`_jmap`), not ``np.log10``,
+    whose SIMD kernels are CPU-dependent."""
+    return _jmap("log10", jlog10, x)
+
+
+def jlog_arr(x: np.ndarray) -> np.ndarray:
+    """Elementwise :func:`jlog` (see :func:`_jmap`)."""
+    return _jmap("log", jlog, x)
 
 
 def jpow(a: float, b: float) -> float:
@@ -384,7 +444,7 @@ def jpow(a: float, b: float) -> float:
     if a < 0.0 and b != math.floor(b):
         return math.nan
     try:
-        return math.pow(a, b)
+        return _pow(a, b)
     except OverflowError:
         if a < 0.0 and _is_odd_integer(b):
             return -math.inf
@@ -477,10 +537,18 @@ def jpow_arr(a: np.ndarray, b: float) -> np.ndarray:
     generic_idx = np.flatnonzero(~special)
     # `.flat` so any array shape works (flatnonzero yields flat indices).
     a_flat, out_flat = a.flat, out.flat
+    if _NATIVE is not None:
+        # The generic elements in one native call: the same correctly
+        # rounded pow as the scalar jpow (overflow gives a signed infinity
+        # instead of raising, which is Java's answer too).
+        base = np.ascontiguousarray(a_flat[generic_idx], dtype="<f8")
+        res = np.frombuffer(_NATIVE.pow_arr(base.tobytes(), b), dtype="<f8")
+        out_flat[generic_idx] = res
+        generic_idx = ()
     for j in generic_idx:
         av = float(a_flat[j])
         try:
-            out_flat[j] = math.pow(av, b)
+            out_flat[j] = _pow(av, b)
         except OverflowError:
             out_flat[j] = -math.inf if (av < 0.0 and b_odd) else math.inf
         except ValueError:
@@ -497,19 +565,24 @@ def jacos(x: float) -> float:
     """Java ``Math.acos``: NaN outside [-1, 1]."""
     if x != x or x < -1.0 or x > 1.0:
         return math.nan
-    return math.acos(x)
+    return _acos(x)
 
 
 def jacos_arr(x: np.ndarray) -> np.ndarray:
-    """Elementwise :func:`jacos`, through libm (see :func:`_libm_map`)."""
-    return _libm_map(jacos, x)
+    """Elementwise :func:`jacos` (see :func:`_jmap`)."""
+    return _jmap("acos", jacos, x)
 
 
 def jasin(x: float) -> float:
     """Java ``Math.asin``: NaN outside [-1, 1]."""
     if x != x or x < -1.0 or x > 1.0:
         return math.nan
-    return math.asin(x)
+    return _asin(x)
+
+
+def jasin_arr(x: np.ndarray) -> np.ndarray:
+    """Elementwise :func:`jasin` (see :func:`_jmap`)."""
+    return _jmap("asin", jasin, x)
 
 
 def jatan(x: float) -> float:
@@ -518,41 +591,32 @@ def jatan(x: float) -> float:
     symmetry and to keep call sites uniform."""
     if x != x:
         return math.nan
-    return math.atan(x)
+    return _atan(x)
+
+
+def jatan_arr(x: np.ndarray) -> np.ndarray:
+    """Elementwise :func:`jatan` (see :func:`_jmap`)."""
+    return _jmap("atan", jatan, x)
 
 
 def jatan2(y: float, x: float) -> float:
-    """Java ``Math.atan2``. Domain-total on both platforms, so this wrapper
-    adds no NaN/edge-case handling -- it exists only so call sites go through
-    `_javacompat` uniformly, and to anchor this comment:
+    """Java ``Math.atan2``, which delegates to ``StrictMath.atan2`` (fdlibm).
 
-    ``java.lang.Math`` (unlike ``StrictMath``) is *not* specified to be
-    bit-reproducible across platforms -- the JLS only requires results within
-    1-2 ulp of correctly rounded and semi-monotonic, deliberately leaving
-    room for a JIT/platform-specific implementation. ``Math.atan2`` hits that
-    slack in practice: verified against the oracle (JDK 21, x86_64 Linux),
-    ``linear.Sobel``'s THETA branch disagrees with Python's ``math.atan2``
-    (glibc) by 1 ulp at pixels where the convolved x-gradient is a tiny
-    nonzero residual (not exactly 0.0) rather than a true axis-aligned case
-    -- e.g. atan2(2.039..., -8.33e-17) rounds to a different double than
-    atan2(2.039..., 0.0) would, and the two libraries' general-case
-    algorithms round that last bit differently. `numpy.arctan2` was checked
-    too and agrees with `math.atan2`, not Java, so this is a genuine
-    fdlibm-vs-glibc divergence, not a Python-specific one. Because
-    ``Math.atan2`` isn't even guaranteed to reproduce across *Java* platforms,
-    chasing bit-exact parity with this one oracle run isn't a well-defined
-    target the way ``Math.sqrt`` (IEEE-754 mandates correct rounding) is.
-    Accepted as a known divergence -- see ``python/README.md``.
+    This used to be an accepted divergence: glibc's ``atan2`` rounds the
+    last bit differently from fdlibm for some inputs (seen in
+    ``linear.Sobel``'s THETA branch, where the x-gradient is a tiny nonzero
+    residual like -8.33e-17). Through the native fdlibm port it is now
+    bit-identical to Java (see the module note above ``_jmap``); the
+    ``math.atan2`` fallback keeps the old divergence.
     """
     if y != y or x != x:
         return math.nan
-    return math.atan2(y, x)
+    return _atan2(y, x)
 
 
 def jatan2_arr(y: np.ndarray, x: np.ndarray) -> np.ndarray:
-    """Elementwise :func:`jatan2`, through libm (see :func:`_libm_map`).
-    Callers inherit the platform-atan2 caveat ``jatan2`` documents above."""
-    return _libm_map(jatan2, y, x)
+    """Elementwise :func:`jatan2` (see :func:`_jmap`)."""
+    return _jmap("atan2", jatan2, y, x)
 
 
 def jsin(x: float) -> float:
@@ -560,38 +624,50 @@ def jsin(x: float) -> float:
     ``ValueError`` on infinity instead)."""
     if x != x or math.isinf(x):
         return math.nan
-    return math.sin(x)
+    return _sin(x)
 
 
 def jcos(x: float) -> float:
     """Java ``Math.cos``: NaN for NaN or +-Infinity."""
     if x != x or math.isinf(x):
         return math.nan
-    return math.cos(x)
+    return _cos(x)
+
+
+def jtan(x: float) -> float:
+    """Java ``Math.tan``: NaN for NaN or +-Infinity."""
+    if x != x or math.isinf(x):
+        return math.nan
+    return _tan(x)
 
 
 def jexp(x: float) -> float:
     """Java ``Math.exp``: +Infinity on overflow (``math.exp`` raises
     ``OverflowError`` instead)."""
     try:
-        return math.exp(x)
+        return _exp(x)
     except OverflowError:
         return math.inf
 
 
 def jsin_arr(x: np.ndarray) -> np.ndarray:
-    """Elementwise :func:`jsin`, through libm (see :func:`_libm_map`)."""
-    return _libm_map(jsin, x)
+    """Elementwise :func:`jsin` (see :func:`_jmap`)."""
+    return _jmap("sin", jsin, x)
 
 
 def jcos_arr(x: np.ndarray) -> np.ndarray:
-    """Elementwise :func:`jcos`, through libm (see :func:`_libm_map`)."""
-    return _libm_map(jcos, x)
+    """Elementwise :func:`jcos` (see :func:`_jmap`)."""
+    return _jmap("cos", jcos, x)
+
+
+def jtan_arr(x: np.ndarray) -> np.ndarray:
+    """Elementwise :func:`jtan` (see :func:`_jmap`)."""
+    return _jmap("tan", jtan, x)
 
 
 def jexp_arr(x: np.ndarray) -> np.ndarray:
-    """Elementwise :func:`jexp`, through libm (see :func:`_libm_map`)."""
-    return _libm_map(jexp, x)
+    """Elementwise :func:`jexp` (see :func:`_jmap`)."""
+    return _jmap("exp", jexp, x)
 
 
 # --------------------------------------------------------------------------
@@ -624,7 +700,11 @@ class Point:
         return float(self.y)
 
     def distance(self, other: Point) -> float:
-        return math.hypot(self.x - other.x, self.y - other.y)
+        # java.awt.geom.Point2D.distance: Math.sqrt(dx * dx + dy * dy) in
+        # doubles, not hypot (which skips the intermediate roundings).
+        dx = float(self.x - other.x)
+        dy = float(self.y - other.y)
+        return math.sqrt(dx * dx + dy * dy)
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Point) and self.x == other.x and self.y == other.y
@@ -654,9 +734,15 @@ __all__ = [
     "jacos",
     "jacos_arr",
     "jasin",
+    "jasin_arr",
     "jatan",
     "jatan2",
     "jatan2_arr",
+    "jatan_arr",
+    "jcos",
+    "jcos_arr",
+    "jexp",
+    "jexp_arr",
     "jbyte",
     "jbyte_arr",
     "jdiv",
@@ -668,12 +754,17 @@ __all__ = [
     "jlog",
     "jlog10",
     "jlog10_arr",
+    "jlog_arr",
     "jpow",
     "jpow_arr",
     "jround",
     "jround_arr",
+    "jsin",
+    "jsin_arr",
     "jsplit",
     "jsqrt",
+    "jtan",
+    "jtan_arr",
 ]
 
 

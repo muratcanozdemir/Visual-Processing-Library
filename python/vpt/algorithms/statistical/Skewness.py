@@ -14,7 +14,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jdiv
+from ..._javacompat import jdiv, jpow
 from ...Algorithm import Algorithm
 from ...GlobalException import GlobalException
 from ...Image import Image
@@ -51,7 +51,7 @@ class Skewness(Algorithm):
         s1 /= size
         s2 /= size
 
-        self.output = jdiv(s1, s2**1.5)
+        self.output = jdiv(s1, jpow(s2, 1.5))
 
     @staticmethod
     def invoke(img: Image) -> float | None:

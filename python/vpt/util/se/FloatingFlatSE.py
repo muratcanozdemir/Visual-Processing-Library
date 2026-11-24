@@ -7,9 +7,8 @@ by the ``mm/gray/floating`` operators.
 
 from __future__ import annotations
 
-import math
 
-from ..._javacompat import Point2D, jround
+from ..._javacompat import Point2D, jcos, jround, jsin
 
 TWO_PI = 6.283185307179586
 
@@ -29,10 +28,10 @@ class FloatingFlatSE:
         for i in range(perimeter):
             # Note the axes: x is driven by -sin and y by +cos, so the walk
             # starts at (0, radius) and turns clockwise. Preserved as written.
-            x = -1 * radius * math.sin(TWO_PI * i / perimeter)
+            x = -1 * radius * jsin(TWO_PI * i / perimeter)
             if abs(jround(x) - x) <= 1.0e-8:
                 x = float(jround(x))
-            y = radius * math.cos(TWO_PI * i / perimeter)
+            y = radius * jcos(TWO_PI * i / perimeter)
             if abs(jround(y) - y) <= 1.0e-8:
                 y = float(jround(y))
             se.coords[i] = Point2D(x, y)

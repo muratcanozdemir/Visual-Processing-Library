@@ -1,0 +1,118 @@
+name: python-wheels
+
+# Builds and verifies the vpt distributions: one abi3 wheel per platform
+# (the Rust kernels in python/src compiled as vpt._native; abi3 means each
+# wheel covers every CPython >= 3.11) plus the sdist. Called by python-ci
+# (every change) and release-please (the release's assets), so a release
+# ships exactly what CI built and tested.
+#
+# Each wheel is installed into clean venvs on its own platform and the full
+# suite re-run against the installed copy, from tests/ so `import vpt` can't
+# resolve to the source tree. VPT_REQUIRE_NATIVE makes a wheel whose
+# extension fails to import fail the run instead of silently falling back
+# to pure Python.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to build (default: the calling workflow's commit)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  wheel:
+    name: wheel (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x86_64, runner: ubuntu-latest, target: x86_64 }
+          - { name: linux-aarch64, runner: ubuntu-24.04-arm, target: aarch64 }
+          - { name: macos-arm64, runner: macos-latest, target: aarch64 }
+          - { name: macos-x86_64, runner: macos-26-intel, target: x86_64 }
+          - { name: windows-x86_64, runner: windows-latest, target: x64 }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      # manylinux: auto builds Linux wheels in the manylinux container, so
+      # they run on any glibc-based distro of that era or newer (ignored on
+      # macOS/Windows).
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          target: ${{ matrix.target }}
+          manylinux: auto
+          args: --release --out dist
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.4.0
+
+      # 3.11 is the abi3 floor, 3.14 the newest supported Python.
+      - name: Verify the wheel installs and passes tests
+        shell: bash
+        working-directory: python
+        env:
+          VPT_REQUIRE_NATIVE: "1"
+        run: |
+          # The wheel must carry the third-party notices (MIT etc. require
+          # them with binary copies).
+          uv run --no-project python - <<'EOF'
+          import glob, zipfile
+          for whl in glob.glob("dist/*.whl"):
+              names = zipfile.ZipFile(whl).namelist()
+              assert any(n.endswith("licenses/THIRD_PARTY_NOTICES") for n in names), whl
+              assert any(n.endswith("licenses/LICENSE") for n in names), whl
+          EOF
+          for py in 3.11 3.14; do
+            venv="$RUNNER_TEMP/wheel-check-$py"
+            uv venv --python "$py" "$venv"
+            uv pip install --python "$venv" dist/*.whl pytest
+            bin="$venv/bin"; [ -d "$bin" ] || bin="$venv/Scripts"
+            ( cd tests && "$bin/python" -m pytest -q )
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vpt-wheel-${{ matrix.name }}
+          path: python/dist/*.whl
+          retention-days: 14
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          command: sdist
+          args: --out dist
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.4.0
+
+      # Installing the sdist compiles the extension from it, so this checks
+      # that the sdist carries everything the build needs (Cargo.lock, src/).
+      - name: Verify the sdist builds, installs and passes tests
+        working-directory: python
+        env:
+          VPT_REQUIRE_NATIVE: "1"
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/sdist-check"
+          uv pip install --python "$RUNNER_TEMP/sdist-check" dist/*.tar.gz pytest
+          cd tests && "$RUNNER_TEMP/sdist-check/bin/python" -m pytest -q
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vpt-sdist
+          path: python/dist/*.tar.gz
+          retention-days: 14

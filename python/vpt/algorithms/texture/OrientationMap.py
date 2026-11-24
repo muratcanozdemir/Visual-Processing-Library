@@ -27,7 +27,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import jatan2, jatan2_arr, jcos_arr, jsin_arr
+from ..._javacompat import jatan2, jatan2_arr, jcos, jcos_arr, jsin, jsin_arr
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -173,8 +173,8 @@ class OrientationMap(Algorithm):
 
                 m = modulus.getXYDouble(_x, _y)
 
-                tmp1 += m * m * math.sin(t * 2.0)
-                tmp2 += m * m * math.cos(t * 2.0)
+                tmp1 += m * m * jsin(t * 2.0)
+                tmp2 += m * m * jcos(t * 2.0)
 
         return (jatan2(tmp1, tmp2) + math.pi) / (2.0 * math.pi)
 

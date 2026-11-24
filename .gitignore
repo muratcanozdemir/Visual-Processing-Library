@@ -17,3 +17,7 @@ python/dist/
 htmlcov/
 # fast-anything profiler/port state (see python/IMPROVEMENTS.md section 8)
 .fast/
+# Rust kernels (python/src, built by maturin into vpt/_native)
+python/target/
+python/vpt/_native*.so
+python/vpt/_native*.pyd

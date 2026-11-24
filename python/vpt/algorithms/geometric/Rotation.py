@@ -10,7 +10,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import idiv, jint, jint_arr, jround_arr
+from ..._javacompat import idiv, jcos, jint, jint_arr, jround_arr, jsin
 from ...Algorithm import Algorithm
 from ...GlobalException import GlobalException
 from ...Image import Image
@@ -43,11 +43,11 @@ class Rotation(Algorithm):
         self.theta = self.theta * math.pi / 180.0
         mtheta = -1.0 * self.theta
 
-        cos = math.cos(self.theta)
-        sin = math.sin(self.theta)
+        cos = jcos(self.theta)
+        sin = jsin(self.theta)
 
-        newXdim = jint(math.ceil(self.xdim * abs(math.cos(mtheta)) + self.ydim * abs(math.sin(mtheta))))
-        newYdim = jint(math.ceil(self.xdim * abs(math.sin(mtheta)) + self.ydim * abs(math.cos(mtheta))))
+        newXdim = jint(math.ceil(self.xdim * abs(jcos(mtheta)) + self.ydim * abs(jsin(mtheta))))
+        newYdim = jint(math.ceil(self.xdim * abs(jsin(mtheta)) + self.ydim * abs(jcos(mtheta))))
 
         xpadding = idiv(newXdim - self.xdim, 2)
         ypadding = idiv(newYdim - self.ydim, 2)

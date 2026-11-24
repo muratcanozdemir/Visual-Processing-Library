@@ -29,7 +29,7 @@ import traceback
 
 import numpy as np
 
-from ..._javacompat import Point, idiv, jdiv, jfloat
+from ..._javacompat import Point, idiv, jacos, jdiv, jfloat
 from ...Algorithm import Algorithm
 from ...GlobalException import GlobalException
 from ...Image import Image
@@ -161,7 +161,7 @@ class Angles(Algorithm):
         elif cos2 <= -1.0:
             alpha2 = math.pi
         else:
-            alpha2 = math.acos(cos2)
+            alpha2 = jacos(cos2)
 
         rslt = alpha2 / 2.0
 

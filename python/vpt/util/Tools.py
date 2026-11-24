@@ -15,7 +15,7 @@ import sys
 
 import numpy as np
 
-from .._javacompat import Point, idiv, jacos, jdiv, jint
+from .._javacompat import Point, idiv, jacos, jatan2, jcos, jdiv, jint, jpow, jsin
 from .Distance import Distance
 
 
@@ -218,8 +218,8 @@ class Tools:
         centerX = idiv(img.getXDim(), 2)
         centerY = idiv(img.getYDim(), 2)
 
-        outerRadius = math.pow(2.0, bandIndex)
-        innerRadius = math.pow(2.0, bandIndex - 1)
+        outerRadius = jpow(2.0, bandIndex)
+        innerRadius = jpow(2.0, bandIndex - 1)
         if bandIndex == 0 or bandIndex == 1:
             outerRadius = 2.0
             innerRadius = 0.0
@@ -242,8 +242,8 @@ class Tools:
 
         maxRadius = math.sqrt(2.0) * min(idiv(xdim, 2), idiv(ydim, 2))
 
-        outerRadius = 1.0 / math.pow(2.0, howManyCircles - bandIndex) * maxRadius
-        innerRadius = 1.0 / math.pow(2.0, howManyCircles - bandIndex + 1) * maxRadius
+        outerRadius = 1.0 / jpow(2.0, howManyCircles - bandIndex) * maxRadius
+        innerRadius = 1.0 / jpow(2.0, howManyCircles - bandIndex + 1) * maxRadius
         if bandIndex <= 1:
             innerRadius = 0.0
 
@@ -275,7 +275,7 @@ class Tools:
                     _y = idiv(ydim, 2) - y
                 else:
                     _y = -1 * (y - idiv(ydim, 2))
-                myAngle = math.atan2(_y, _x)
+                myAngle = jatan2(_y, _x)
                 if myAngle < 0.0:
                     myAngle += 3.141592653589793
                 if angle1 >= myAngle >= angle2:
@@ -464,8 +464,8 @@ class Tools:
         for i in range(n):
             real[i] = imag[i] = 0.0
             for j in range(n):
-                real[i] += d[j] * math.cos(-6.283185307179586 * j * i / n)
-                imag[i] += d[j] * math.sin(-6.283185307179586 * j * i / n)
+                real[i] += d[j] * jcos(-6.283185307179586 * j * i / n)
+                imag[i] += d[j] * jsin(-6.283185307179586 * j * i / n)
             real[i] /= math.sqrt(n)
             imag[i] /= math.sqrt(n)
         for i in range(n):
@@ -481,8 +481,8 @@ class Tools:
         for i in range(n):
             real[i] = imag[i] = 0.0
             for j in range(n):
-                real[i] += d[j] * math.cos(-6.283185307179586 * j * i / n)
-                imag[i] += d[j] * math.sin(-6.283185307179586 * j * i / n)
+                real[i] += d[j] * jcos(-6.283185307179586 * j * i / n)
+                imag[i] += d[j] * jsin(-6.283185307179586 * j * i / n)
             real[i] /= math.sqrt(n)
             imag[i] /= math.sqrt(n)
         for i in range(n):

@@ -19,7 +19,7 @@ iterate the full padded ``size``, not ``width``/``height``."""
 
 from __future__ import annotations
 
-from .._javacompat import jint
+from .._javacompat import jint, jpow
 from .ComplexNumber import ComplexNumber
 
 
@@ -41,9 +41,9 @@ class Complex2DArray:
         self.width = w
         self.height = h
         n = 0
-        while 2.0**n < max(w, h):
+        while jpow(2.0, n) < max(w, h):
             n += 1
-        self.size = jint(2.0**n)
+        self.size = jint(jpow(2.0, n))
         self.values = [[ComplexNumber(0.0, 0.0) for _ in range(self.size)] for _ in range(self.size)]
 
         if content is None:

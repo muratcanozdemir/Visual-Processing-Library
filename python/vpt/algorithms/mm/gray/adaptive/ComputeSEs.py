@@ -20,7 +20,10 @@ from __future__ import annotations
 
 import traceback
 
+import numpy as np
+
 from ....._javacompat import Point, idiv
+from ..... import _accel
 from .....Algorithm import Algorithm
 from .....ByteImage import ByteImage
 from .....GlobalException import GlobalException
@@ -57,9 +60,39 @@ class ComputeSEs(Algorithm):
             raise GlobalException("Cannot handle non grayscale images yet...")
 
         self.output = [[None] * self.ydim for _ in range(self.xdim)]
+        if self._executeNative():
+            return
         for y in range(self.ydim):
             for x in range(self.xdim):
                 self.output[x][y] = self._computeAmoeba(Point(x, y))
+
+    def _executeNative(self) -> bool:
+        """Every pixel's amoeba from the Rust kernel (``python/src/amoeba.rs``,
+        a step-for-step transcription of ``_computeAmoeba``), when available.
+        Each ``FlatSE`` is still built here exactly as ``_computeAmoeba``
+        builds it -- ``FlatSE.square`` then ``fill(False)`` -- and gets the
+        kernel's mask as its pixels. Returns False to fall back to the
+        Python."""
+        native = _accel.native
+        if native is None or type(self.size) is not int:
+            return False
+        n = self.xdim * self.ydim
+        # getXYByte(x, y) reads flat index x + xdim * y; getByteArray agrees
+        # with getByte element for element on every image type.
+        pixels = np.ascontiguousarray(self.input.getByteArray()[:n], dtype="<i8")
+        raw = native.amoeba_masks(
+            pixels.tobytes(), self.xdim, self.ydim, _accel.clamp_i64(self.size)
+        )
+        masks = np.frombuffer(raw, dtype=np.uint8).astype(bool)
+        if n:
+            masks = masks.reshape(n, -1)
+        for y in range(self.ydim):
+            for x in range(self.xdim):
+                adaptedSE = FlatSE.square(self.size * 2 + 1)
+                adaptedSE.fill(False)
+                adaptedSE.setBooleanArray(masks[x + self.xdim * y])
+                self.output[x][y] = adaptedSE
+        return True
 
     def _computeAmoeba(self, r: Point) -> FlatSE:
         adaptedSE = FlatSE.square(self.size * 2 + 1)

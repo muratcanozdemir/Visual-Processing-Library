@@ -27,6 +27,7 @@ from pathlib import Path
 
 import pytest
 
+from _platform import libm_ulp
 from vpt import ByteImage
 from vpt.algorithms.mm.gray.connected.attribute.Area import Area
 from vpt.algorithms.texture import (
@@ -210,7 +211,7 @@ def test_texture_matches_java_oracle():
 
     check_vector("OrientationHistogram(gray)", OrientationHistogram.invoke(gray, 8, 3))
 
-    check_double("OrientationMap(gray)", OrientationMap.invoke(gray, 3), max_ulp=2)
+    check_double("OrientationMap(gray)", OrientationMap.invoke(gray, 3), max_ulp=libm_ulp(2))
 
     check_vector(
         "RotationInvariantGaborFeatures(gray)", RotationInvariantGaborFeatures.invoke(gray, 2)

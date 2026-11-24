@@ -1,0 +1,27 @@
+# Native (Rust) kernels for vpt, built by maturin as the `vpt._native`
+# extension module (see [tool.maturin] in pyproject.toml). The package's
+# version lives in pyproject.toml (release-please bumps it there); maturin
+# takes the wheel's version from there, so this crate version is unused.
+[package]
+name = "vpt-native"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+# abi3: one wheel per platform covers every CPython >= 3.11 (the package's
+# requires-python floor).
+pyo3 = { version = "0.30", features = ["extension-module", "abi3-py311"] }
+# fdlibm-derived libm (a port of musl): bit-identical to Java's
+# StrictMath for asin/acos/atan/atan2, which java.lang.Math delegates to.
+libm = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

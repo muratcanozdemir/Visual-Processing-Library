@@ -897,10 +897,11 @@ and the attribute-predicate files lowest (real but marginal value).
 
 ## 8. Profiler-driven hotspot scan (2026-11-23, fast-anything)
 
-**Status:** `[x]` all three implemented in pure Python, each bit-identical
-to the code it replaced (2026-11-23); full suite 9.7s -> 3.7s. A verified
-Rust port of 8.2's kernel exists locally but is **not shipped** -- see
-8.2.
+**Status:** `[x]` 8.1-8.3 implemented in pure Python, each bit-identical
+to the code it replaced (2026-11-23); full suite 9.7s -> 3.7s. Second scan
+the same day: the remaining hotspots (8.2's kernel, 8.4, 8.5) now have
+**Rust kernels**, shipped as the `vpt._native` extension built by maturin
+(8.6); suite 3.5s -> 1.4s.
 
 **How it was found.** [`fast-anything`](https://github.com/EL4CTEO/fast-anything)
 v0.8.1 (commit `445abd1`, reviewed before use) profiled the golden test
@@ -966,7 +967,8 @@ Identical to the recursive code on 564 cases (Boolean/Byte/Integer/Double
 inputs incl. 3-channel, random/line/full masks, runs > 255). 2.4x faster,
 and it can no longer hit Python's recursion limit on large images.
 
-**Rust port (fast-anything), verified but not shipped.** The kernel takes
+**Rust port: shipped (8.6).** The note below is from the first scan; the
+kernel now lives in `python/src/path.rs`. The kernel takes
 plain data, so fast-anything could port it: `fast-anything port
 vpt.algorithms.mm.binary.path.BPathOpening.path_run_lengths --agent claude`
 produced a PyO3 crate (reviewed: same scan orders and neighbours, zero-
@@ -974,12 +976,11 @@ padded border, no `build.rs`, only `pyo3`) on the first attempt; 508/508
 replayed calls identical (integer results, so the 1e-9 tolerance is moot).
 With it enabled, the golden suite passes and the 564-case comparison still
 matches. Speed: `BPathOpening` 128x128 120ms (recursive) -> 52ms (Python
-kernel) -> 4ms (Rust); `GPathOpening` 64x64 2.75s -> 0.23s. It lives in
-`python/.fast/` (gitignored) and is switched off in committed code: the
-`enable` shim imports the extension from that local path, so shipping it
-would put a hook in every wheel that only works in one checkout. Shipping
-it for real needs a native build (maturin, per-platform wheels) -- an open
-decision. Locally: `fast-anything enable <id>` / `disable <id>`.
+kernel) -> 4ms (Rust); `GPathOpening` 64x64 2.75s -> 0.23s. fast-anything's
+own `enable` shim imports the extension from `python/.fast/` (gitignored),
+so it can't ship; the generated code was adapted into the maturin crate
+instead (bytes in/out, no fast-anything hook). The `.fast/` port is now
+redundant -- leave it disabled.
 
 ### 8.3 `flatzones/angular/AngularQFZ2.py`
 **Share:** ~7%.
@@ -997,6 +998,181 @@ retry-forcing ones), ~9x faster; the running max matched the full rescan on
 3000 random value lists with NaN/+-inf/signed zeros.
 
 ---
+
+### Second scan (2026-11-23, after 8.1-8.3)
+
+Same command, on `main` at `27a68dd`. Unprofiled suite 3.68s, of which
+`test_misc_golden` (path openings) took 1.9s. Ranked by cumulative time
+under cProfile (12.4s profiled), per `execute`:
+
+| Algorithm | Share | Calls | Notes |
+|---|---|---|---|
+| `GPathOpening` / `BPathOpening` / `VeinProfile` | ~45% | 5 / 1,279 / 1 | one chain; 36% is 8.2's kernel |
+| `GAreaOpening` / `BAreaOpening` | ~17% | 8 / 2,051 | 8.4; also `GAreaClosing` (13%), `AreaGranulometry` (11%) |
+| `ComputeSEs` | ~6% | 1 | 8.5 |
+| everything else | <2% each | | |
+
+Rust feasibility rule from the caveat above: only integer/boolean kernels,
+where "exact" is unambiguous. All three qualify. With them in place the
+profile is flat (re-scan, native on): the largest `execute` is `VeinProfile`
+at ~10% of a 4.2s profiled run, made of the Python around the kernels
+(`Maximum`, `Threshold`, image copies); next are `ADilation`/`GDilation`,
+the `RotationInvariantGabor` family and `MFastReconstruction` at ~5% each,
+all float code already vectorized in numpy. None is worth a native port on
+this evidence; re-profile with real-size inputs before adding more.
+
+### 8.4 `mm/binary/attribute/BAreaOpening.py` / `BAreaClosing.py`
+**Share:** ~17% (2,051 calls: `GAreaOpening`/`GAreaClosing` threshold-
+decompose at all 256 levels and run one per level; `AreaGranulometry` runs
+those per area).
+**Why slow:** a flood fill pushing 8 `Point` objects per pixel and reading
+and writing one pixel per method call.
+**Done in Rust** (`python/src/area.rs`, `small_components`): which pixels a
+call clears (opening) or sets (closing) is exactly the union of the
+8-connected components of fewer than `area` pixels, independent of fill
+order, so the kernel labels components with an index stack and returns
+that mask. Read like `getXYBoolean` (first `xdim * ydim` entries, so
+multi-channel inputs behave as before); a non-`int` `area` stays on the
+Python path. 256x256: 89ms -> 2ms; `GAreaOpening` 64x64: 1.19s -> 26ms.
+
+### 8.5 `mm/gray/adaptive/ComputeSEs.py`
+**Share:** ~6% (one call; O(pixels x SE area)).
+**Done in Rust** (`python/src/amoeba.rs`, `amoeba_masks`): a step-for-step
+transcription of `_computeAmoeba` -- same LIFO stack and neighbour order,
+`tmpImg`'s mod-256 byte storage, and numpy's negative-index wrap for the
+`FlatSE` write -- since with `size // 2 >= 256` the wraparound makes the
+visiting order observable. The cost `int(tmp + 1 + 0.25*abs(p - q))` is
+exact in doubles for 32-bit `getXYByte` values, so the kernel's integer
+`tmp + 1 + |p - q| / 4` is the same number. `FlatSE`s are still built in
+Python (`FlatSE.square` + `fill(False)`, then the mask), which now
+dominates: 64x64 at size 5, 32ms -> 9ms.
+
+### 8.6 How the native kernels ship (maturin)
+- `python/Cargo.toml` + `python/src/*.rs` build the `vpt._native`
+  extension (PyO3, abi3 for CPython >= 3.11, so one wheel per platform).
+  The build backend is maturin instead of hatchling; the version still
+  lives only in `pyproject.toml` (release-please is unchanged).
+- `vpt/_accel.py` imports it; each algorithm uses its kernel when
+  `_accel.native` is set and runs the unchanged Python otherwise. The
+  Python stays the reference. `VPT_PURE_PYTHON=1` switches the extension
+  off; `VPT_REQUIRE_NATIVE=1` makes a failed import an error (CI).
+- `tests/test_native_parity.py` runs each algorithm with the kernel on and
+  off and compares raw storage on all image types, multi-channel inputs,
+  degenerate sizes, runs > 255, out-of-range `area`, and the `ComputeSEs`
+  wraparound/negative-index cases. Mutating any kernel (comparison
+  operator, a neighbour, the byte wrap, the floor in the cost, the index
+  wrap) fails it.
+- CI: `python-ci` lints the Rust (`cargo fmt`, `clippy -D warnings`), runs
+  the goldens natively on 3.11-3.14 plus once pure-Python, then
+  `python-wheels.yml` builds wheels (manylinux x86_64/aarch64, macOS
+  arm64/x86_64, Windows x64) and the sdist and re-runs the suite against
+  each installed artifact. `release-please.yml` calls the same workflow
+  and attaches its output, so releases ship what CI tested.
+- Platforms without a wheel install from the sdist, which needs a Rust
+  toolchain. There is no pure-Python wheel any more.
+
+## 9. Platform-independent `java.lang.Math` (2026-11-23)
+
+**Status:** `[x]` -- found when PR #12's wheel matrix ran the golden
+suite on macOS and Windows for the first time: 2-5 golden tests failed
+there (XYZ2LAB/LAB2XYZ, `javacompat` acos/asin/atan, `FloatingFlatSE.circle`,
+`FourierDescriptor`, ...), each by 1-2 ulp, because `math.*` is the
+platform libm and only glibc happened to agree with the oracle.
+
+**What Java computes** (JDK 21, x86_64 HotSpot; measured with 200,000
+random inputs per function, `Math` vs `StrictMath`):
+- `asin`, `acos`, `atan`, `atan2` (and `hypot`): `StrictMath`, i.e.
+  fdlibm, exactly.
+- `sin`, `cos`, `tan`, `exp`, `log`, `log10`, `pow`: HotSpot intrinsics
+  (Intel's libm, in HotSpot's source only), not fdlibm.
+
+**Candidates measured against `Math`** (mismatches per 200,000):
+
+| fn | glibc | `libm` crate (musl/fdlibm) | correctly rounded (CORE-MATH) |
+|---|---|---|---|
+| asin / acos / atan | 7,121-15,132 | **0** | 7,150-15,187 |
+| atan2 | 35,464 | 0 random, but see below | 35,475 |
+| log / log10 | 11 / 7,541 | 2,378 / 267 | **0 / 0** |
+| sin / cos / tan | 499 / 365 / 1,912 | 5,948 / 5,741 / 7,025 | **289 / 237 / 456** |
+| exp / pow | 500 / 214 | 19,182 / 18,168 | **473 / 99** |
+
+**Done:** `vpt._native` (`python/src/jmath.rs`) provides them all, and
+every `j*` helper in `_javacompat` computes through it:
+- `asin`/`acos`/`atan`: the `libm` crate -- 0 differences in a further
+  900,000 inputs each spread over every exponent.
+- `atan2`: fdlibm's `e_atan2.c` transcribed. The `libm` crate's differs
+  where `|y/x| > 2^60` and `x < 0` (musl returns `+-pi/2`, fdlibm
+  `pi - (z - pi_lo)`): 83,331 of 900,000 stress inputs, and exactly
+  `Sobel.THETA`'s documented divergence. The transcription: 0 in 1.1M.
+- `sin`/`cos`/`tan`/`exp`/`log`/`log10`/`pow`: CORE-MATH, translated
+  to safe Rust (`python/src/cm`, see 9.1). The residual mismatches are
+  all Intel misroundings: the 11 in `tests/goldens/jmath.txt` were checked
+  at 200-bit precision. Matching those too would mean porting HotSpot's
+  intrinsic code (`src/hotspot/cpu/x86/macroAssembler_x86_*.cpp`, Intel's,
+  distributed under the GPLv2 with the rest of HotSpot) into this MIT
+  package -- a licensing decision, not an engineering one, so not done.
+- Every direct platform-math call outside `_javacompat` (114 sites in 30
+  files: `math.sin`, `np.exp`, float `**`, ...) now goes through a `j*`
+  helper; `tests/test_no_platform_math.py` fails on any new one. Along
+  the way: `InvariantMoment`/`MultiInvariantMoment` used exact `int ** int`
+  where Java rounds each `Math.pow` separately (now `jpow`), and
+  `Point.distance` used `hypot` where Java computes
+  `sqrt(dx * dx + dy * dy)`.
+
+**Result:** with the extension, the golden suite passes with every libm
+tolerance removed (Sobel THETA, ZernikeMoment, OrientationMap, LoadFLO,
+point.Log, RGB2HSY/RGB2NUHSY733, spectralAngleDistance), on every platform.
+Only `shape.ZernikeMoments` keeps one (<= 8 ulp): 9 of its 8,362 distinct
+`sin`/`cos`/`pow` arguments are intrinsic misroundings (replayed through
+the JVM). The pure-Python fallback keeps the old tolerances
+(`tests/_platform.py`).
+
+### 9.1 CORE-MATH in Rust instead of vendored C (2026-11-24)
+
+The first version vendored seven CORE-MATH C files (820 KB) and compiled
+them with `cc` (`-ffp-contract=off`, no `-march=native`, `clang-cl` on
+Windows). Replaced by Rust translations, so the extension is pure Rust:
+
+| Module | From | Rust lines (incl. tables) |
+|---|---|---|
+| `src/cm/trig` | sin.c, cos.c, tan.c (shared code merged) | ~3,860 |
+| `src/cm/explog` | exp.c, log.c, log10.c, dint.h | ~3,230 |
+| `src/cm/pow` | pow.c, pow.h, dint.h, qint.h | ~12,750 |
+
+Each file carries CORE-MATH's copyright and MIT notice (also in
+`THIRD_PARTY_NOTICES`). Translation rules: no `unsafe`, no dependencies;
+tables converted by script and re-checked against the C bit for bit;
+round-to-nearest only (the directed-rounding branches, errno and FP-flag
+code dropped -- callers never change the rounding mode); every C `fma`
+is `f64::mul_add` (the C has no non-FMA alternatives in these files).
+
+**Verification against the C** (compiled unmodified at `-O2
+-ffp-contract=off`, and the `core-math` crate), all bit for bit, NaN
+payloads included -- 0 mismatches everywhere:
+
+| | random inputs / fn | accurate phases forced on / fn | special grid |
+|---|---|---|---|
+| sin, cos, tan | 1,000,000,000 | 200,000,000 | 257,536 |
+| exp, log, log10 | 250,000,000 | 100,000,000 | 8,488 |
+| pow | 1,200,000,006 | 100,000,000 (phase 1 off) + 100,000,000 (phases 1-2 off) | 50x50 grid + 1,334,328 pairs |
+
+"Forced on": a copy of the C and the Rust with the fast path's
+acceptance test made to fail, so every input goes through the accurate
+evaluation that random inputs rarely reach (0.01-18% depending on
+function and input mix; pow's 256-bit phase 0.11%). Debug builds with
+overflow checks found no wrap or out-of-range shift. Against the Java
+dump, the Rust gives the same mismatch counts as the C (sin 289, cos 237,
+tan 456, exp 473, pow 99, log/log10 0 of 200,000 each).
+
+The C is gone, so that comparison can't be re-run from this tree.
+`tests/goldens/crmath.txt` (14,000 rows frozen from the C, weighted
+towards accurate-phase inputs) keeps checking the translation on every
+wheel platform, and `test_fma_is_fused` checks that `f64::mul_add` really
+is fused there (without hardware FMA it calls the platform's `fma()`).
+
+Speed: same as the C at the same flags. On the baseline x86-64 target the
+`mul_add`s become libm `fma()` calls (sin ~45 ns, pow ~68 ns); with FMA
+enabled (`-C target-cpu=native`) ~2-4x faster, same results.
 
 ## Areas audited with no findings (don't re-audit from scratch)
 

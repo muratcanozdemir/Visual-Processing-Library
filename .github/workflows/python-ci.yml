@@ -7,12 +7,14 @@ on:
     paths:
       - "python/**"
       - ".github/workflows/python-ci.yml"
+      - ".github/workflows/python-wheels.yml"
       - "release-please-config.json"
       - ".release-please-manifest.json"
   pull_request:
     paths:
       - "python/**"
       - ".github/workflows/python-ci.yml"
+      - ".github/workflows/python-wheels.yml"
       - "release-please-config.json"
       - ".release-please-manifest.json"
   workflow_dispatch:
@@ -46,10 +48,22 @@ jobs:
       - name: Ruff check
         run: uv run --locked --only-group lint ruff check .
 
+      # The Rust kernels (python/src, built as vpt._native).
+      - name: Rust format and lints
+        run: |
+          rustup component add rustfmt clippy
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+
       # python/LICENSE is a copy of the repo-root LICENSE so it can ship in
       # the wheel/sdist (build backends won't read outside python/).
       - name: Bundled LICENSE matches the repo's
         run: cmp LICENSE ../LICENSE
+
+      # Every wheel ships THIRD_PARTY_NOTICES (the licenses of the code
+      # compiled into vpt._native); fail if a dependency change left it stale.
+      - name: Third-party notices are current
+        run: python3 scripts/third_party_notices.py --check
 
       # release-please owns the version: its release PRs bump pyproject.toml,
       # uv.lock's vpt entry and .release-please-manifest.json together. Fail
@@ -73,6 +87,13 @@ jobs:
       matrix:
         # requires-python floor is 3.11; 3.14 is the current latest.
         python: ["3.11", "3.12", "3.13", "3.14"]
+        impl: [native]
+        include:
+          # The pure-Python code is the reference the Rust kernels are
+          # checked against, and the fallback where vpt._native isn't
+          # built: keep it passing the goldens on its own.
+          - python: "3.13"
+            impl: pure
 
     steps:
       - uses: actions/checkout@v7
@@ -84,38 +105,16 @@ jobs:
           enable-cache: true
           cache-dependency-glob: python/uv.lock
 
-      - name: Run golden test suite
+      # uv builds the package (and the Rust extension, with the runner's
+      # preinstalled toolchain) before running.
+      - name: Run golden test suite (${{ matrix.impl }})
+        env:
+          VPT_REQUIRE_NATIVE: ${{ matrix.impl == 'native' && '1' || '' }}
+          VPT_PURE_PYTHON: ${{ matrix.impl == 'pure' && '1' || '' }}
         run: uv run --locked --group test pytest -q --cov=vpt --cov-report=term-missing
 
-  build:
+  # Platform wheels + sdist, each installed and re-tested (shared with
+  # release-please.yml, which ships what this builds).
+  dist:
     needs: [lint, test]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.4.0
-        with:
-          python-version: "3.12"
-          enable-cache: true
-          cache-dependency-glob: python/uv.lock
-
-      - name: Build sdist and wheel
-        run: uv build
-
-      # A wheel that only ever gets built, never installed, can still hide
-      # packaging bugs (missing package data, a bad include list). Install it
-      # into a fresh venv and re-run the suite against the installed copy,
-      # from tests/ so `import vpt` can't resolve to the source tree.
-      - name: Verify wheel installs and passes tests
-        run: |
-          uv venv /tmp/wheel-check
-          uv pip install --python /tmp/wheel-check dist/*.whl pytest pytest-cov
-          cd tests
-          /tmp/wheel-check/bin/python -m pytest -q
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: vpt-python-dist
-          path: python/dist/*
-          retention-days: 14
+    uses: ./.github/workflows/python-wheels.yml

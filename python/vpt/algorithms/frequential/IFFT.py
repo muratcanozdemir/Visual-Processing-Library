@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import traceback
 
+from ..._javacompat import jpow
 from ...Algorithm import Algorithm
 from ...DoubleImage import DoubleImage
 from ...GlobalException import GlobalException
@@ -37,12 +38,12 @@ class IFFT(Algorithm):
         content = [[None] * ydim for _ in range(xdim)]
 
         n = 0
-        while 2.0**n < max(xdim, ydim):
+        while jpow(2.0, n) < max(xdim, ydim):
             n += 1
         for x in range(xdim):
             for y in range(ydim):
-                realP = self.real.getXYDouble(x, y) * 2.0**n
-                imagP = self.imag.getXYDouble(x, y) * 2.0**n
+                realP = self.real.getXYDouble(x, y) * jpow(2.0, n)
+                imagP = self.imag.getXYDouble(x, y) * jpow(2.0, n)
                 content[x][y] = ComplexNumber(realP, imagP)
 
         inputArray = Complex2DArray(content, xdim, ydim)

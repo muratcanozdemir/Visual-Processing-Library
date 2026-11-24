@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from _platform import libm_ulp
 from vpt import BooleanImage, ByteImage
 from vpt.algorithms.statistical import (
     NMSE,
@@ -181,9 +182,9 @@ def test_statistical_matches_java_oracle():
     # transcendental-function divergences in this port (Math.atan2,
     # Math.acos, Math.log10), up to a couple of these can disagree with
     # Java's by a few ulp at specific inputs. See python/README.md.
-    check_value("ZernikeMoment(g,4,2)", ZernikeMoment.invoke(g, 4, 2), max_ulp=2)
-    check_value("ZernikeMoment(g,6,0)", ZernikeMoment.invoke(g, 6, 0), max_ulp=2)
-    check_value("ZernikeMoment(g,5,3)", ZernikeMoment.invoke(g, 5, 3), max_ulp=2)
+    check_value("ZernikeMoment(g,4,2)", ZernikeMoment.invoke(g, 4, 2), max_ulp=libm_ulp(2))
+    check_value("ZernikeMoment(g,6,0)", ZernikeMoment.invoke(g, 6, 0), max_ulp=libm_ulp(2))
+    check_value("ZernikeMoment(g,5,3)", ZernikeMoment.invoke(g, 5, 3), max_ulp=libm_ulp(2))
 
     rgb = make_rgb()
     eigenvectors = [

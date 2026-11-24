@@ -6,14 +6,17 @@ against golden values dumped from it.
 
 ## Install
 
-From a release (`.whl` attached to each `python-v*` GitHub release):
+From a release: each `python-v*` GitHub release has a wheel per platform
+(Linux x86_64/aarch64, macOS arm64/x86_64, Windows x64; each covers
+CPython 3.11+) and the sdist. Pick the wheel for your platform:
 
 ```sh
-pip install vpt-<version>-py3-none-any.whl
+pip install vpt-<version>-cp311-abi3-<platform>.whl
 ```
 
-From source, with [uv](https://docs.astral.sh/uv/) (installs the `dev`
-dependency group: pytest, pytest-cov, ruff):
+From source, with [uv](https://docs.astral.sh/uv/) and a Rust toolchain
+([rustup](https://rustup.rs/)); `uv sync` builds the extension with maturin
+and installs the `dev` dependency group (pytest, pytest-cov, ruff):
 
 ```sh
 cd python
@@ -22,6 +25,20 @@ uv run pytest
 ```
 
 Requires Python 3.11+ and NumPy.
+
+### Native kernels
+
+A few hot loops (path openings, area openings/closings, `ComputeSEs`) have
+Rust implementations in `src/`, compiled into the `vpt._native` extension.
+They return exactly what the Python code returns -- integer/boolean work
+only, checked by `tests/test_native_parity.py` -- and are 30-45x faster
+on those algorithms. The extension also carries the port's math functions
+(`sin`, `atan2`, `pow`, ...): Java's, reproduced identically on every
+platform, where `math`/numpy differ by OS (see "Transcendental functions"
+under Known divergences). The Python code stays the reference and the
+fallback: set `VPT_PURE_PYTHON=1` to run without the extension (math then
+matches the goldens on Linux/glibc only), or `VPT_REQUIRE_NATIVE=1` to fail
+if it can't be loaded. See `IMPROVEMENTS.md` sections 8 and 9.
 
 ## Releasing
 
@@ -40,8 +57,9 @@ the last `python-v*` tag. With squash merges, that's the **PR title**:
 | `docs:`, `test:`, `build:`, `ci:`, `chore:`, `refactor:` | no release on their own |
 
 Merging the release PR tags `python-vX.Y.Z` and creates the GitHub release;
-`.github/workflows/release-please.yml` then builds the wheel and sdist,
-re-runs the suite against the installed wheel, and attaches them with
+`.github/workflows/release-please.yml` then builds the platform wheels and
+the sdist (`python-wheels.yml`, the same workflow CI runs), re-runs the
+suite against each installed artifact, and attaches them with
 `SHA256SUMS`. CI fails if the three version locations ever disagree.
 
 ## Quick start
@@ -237,22 +255,30 @@ still shows the expected Java crash (a `THREW` sentinel written by
 `oracle/DumpConnected.java`'s `dumpGraySafe`, not a bit-exact pixel row) and
 that Python still produces real output, rather than comparing pixel-for-pixel.
 
-**`linear.Sobel`'s `THETA` branch: 1-ulp `Math.atan2` divergence.** Confirmed
-against the JDK 21 oracle: at pixels where the convolved x-gradient is a tiny
-nonzero residual rather than exactly `0.0` (e.g. `atan2(2.039…, -8.33e-17)`),
-Java's `Math.atan2` and Python's `math.atan2` (glibc) round the last bit
-differently — checked, `numpy.arctan2` agrees with `math.atan2`, not Java, so
-this is a genuine fdlibm-vs-glibc difference, not a Python-specific one.
-`java.lang.Math` (unlike `StrictMath`) is not specified to be bit-reproducible
-across platforms in the first place — the JLS only requires results within
-1-2 ulp of correctly rounded, deliberately leaving room for a
-platform/JIT-specific implementation — so bit-exact parity with this one
-oracle run isn't a well-defined target the way `Math.sqrt` (IEEE-754 mandates
-correct rounding) is. See `_javacompat.jatan2` and `Sobel.py`.
-`test_linhist_golden.py`'s `doubles_agree` takes a `max_ulp` parameter, set to
-1 only for the un-normalized `THETA` check; contrast-stretching (`normalized`)
-is unaffected and still compared bit-exact — verified that all 256 pixels
-agree, since the affine rescale doesn't preserve the 1-ulp gap at these values.
+**Transcendental functions (`Math.sin`, `Math.atan2`, `Math.pow`, ...):
+resolved through `vpt._native`, except for rare intrinsic misroundings.**
+These used to be the port's main source of divergence: `java.lang.Math`
+isn't the platform C library, so `math.*`/numpy matched the oracle only up
+to an ulp or two -- `linear.Sobel`'s `THETA` (`atan2(2.039…, -8.33e-17)`),
+`ZernikeMoment(s)`, `OrientationMap`, `LoadFLO`, `point.Log`, `RGB2HSY`
+and others carried 1-8 ulp tolerances -- and the libm differs by OS, so the
+goldens that passed on Linux failed on macOS and Windows. The JDK 21
+oracle computes `asin`/`acos`/`atan`/`atan2` with fdlibm (`StrictMath`)
+and `sin`/`cos`/`tan`/`exp`/`log`/`log10`/`pow` with HotSpot's x86_64
+intrinsics. `vpt._native` (`src/jmath.rs`) reproduces the fdlibm ones bit
+for bit and computes the others correctly rounded (CORE-MATH, translated
+to Rust in `src/cm`), which is what the intrinsics return except in
+hard-to-round cases: about 0.05-0.25% of random `sin`/`cos`/`tan`/`exp`/
+`pow` inputs, where the exact value sits within ~1% of an ulp of a
+rounding midpoint and the intrinsic picks the wrong side. With the
+extension, every former tolerance above is gone (bit-exact on every
+platform); the one remaining tolerance is `shape.ZernikeMoments` (<= 8
+ulp), whose ~100,000 calls include 9 such misrounded `sin`/`cos`/`pow`
+values -- confirmed by replaying each call through the JVM. That residue
+is deterministic, identical on every OS and CPU. `tests/test_jmath_golden.py`
+pins the functions themselves against `oracle/DumpJMath.java`. Without the
+extension (`VPT_PURE_PYTHON=1`) the port falls back to `math`/libm and the
+old tolerances apply (`tests/_platform.py:libm_ulp`), on Linux/glibc only.
 
 **`point.Log`'s `Math.log10`: same 1-ulp fdlibm-vs-glibc divergence, different
 function.** Confirmed against the JDK 21 oracle (`oracle/DumpPoint.java`):
